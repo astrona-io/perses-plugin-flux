@@ -22,6 +22,7 @@ const VIEW_LABEL: Record<FluxView, string> = {
   sources: 'Sources',
   inventory: 'Inventory',
   list: 'List',
+  flux: 'Flux resources',
 };
 
 /** Every option in the schema, with the defaults `withDefaults` applies. */

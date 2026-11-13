@@ -34,7 +34,7 @@ there.
 
 ## What it shows
 
-Five views, a header and a drawer:
+Six views, a header and a drawer:
 
 - **KPI tiles**: controllers ready, sources, Kustomizations, Helm releases, suspended, and the sync status (from
   the FluxReport when the Flux Operator is installed).
@@ -50,6 +50,8 @@ Five views, a header and a drawer:
   `1.2.3 → 1.4.0 (in range)` when Flux picks the newer chart up on its next reconcile, `(needs a bump)` when it is
   outside `spec.chart.spec.version`, `✓ newest`, or "not checked" with the reason in a tooltip (see
   [Chart updates](#chart-updates)).
+- **Flux resources**: the Flux installation, its controllers and how many objects of each Flux kind are in which
+  state. See [Flux resources](#flux-resources).
 - **Drawer**: conditions with reason and message, revisions with commit links, Helm history, the chart update,
   recent events, what the object blocks, and links to the Flux Operator web UI.
 
@@ -94,6 +96,21 @@ The rules, with the Flux docs and code they come from, are in [docs/DECISIONS.md
 
 The panel detects which is installed: when the `fluxcd.controlplane.io` lists answer, it uses them; when they
 return 404 it carries on with plain Flux.
+
+### Flux resources
+
+The `flux` view shows Flux itself, and always says where its numbers come from:
+
+| | Plain Flux | With the Flux Operator |
+| --- | --- | --- |
+| Installation | none | FluxInstance: Ready, version requested and running, distribution, registry, last applied revision, components, sync source; operator and cluster versions |
+| Controllers | the controller Deployments: ready replicas, image and tag | the FluxReport's `components`: ready, status, image |
+| Objects by kind | counted by the panel from what it read: total, ready, reconciling, waiting, failed, suspended | the FluxReport's `reconcilers`: running, failing, suspended, artifact storage |
+
+With the Prometheus datasource set, each kind also gets reconciles per minute and the mean reconcile duration over
+the dashboard range (`gotk_reconcile_duration_seconds`). A list the panel could not read shows its error, never zero.
+The panel's own counts cover only the namespaces in the `namespaces` option. The FluxReport is refreshed by the
+operator and can lag a few minutes. Field sources are in [docs/DECISIONS.md](docs/DECISIONS.md#flux-resources-view).
 
 ## Security model
 
@@ -240,7 +257,7 @@ Every option is optional.
 | `cluster` | none | value of the `cluster` label in Prometheus queries |
 | `namespaces` | all | only these namespaces (cluster-scoped objects always show) |
 | `rootKustomization` | `auto` (`flux-system/flux-system`, or the FluxInstance) | `name` or `namespace/name` |
-| `defaultView` | `tree` | `tree`, `stages`, `sources`, `inventory`, `list` |
+| `defaultView` | `tree` | `tree`, `stages`, `sources`, `inventory`, `list`, `flux` |
 | `showSources` | `true` | |
 | `showHelmReleases` | `true` | |
 | `onlyProblems` | `false` | keep only problems and the path to them |

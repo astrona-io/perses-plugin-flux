@@ -105,17 +105,52 @@ export interface EstateNode {
   defines?: { group: string; plural: string };
   /** For a PersistentVolumeClaim: the requested size. */
   storage?: string;
+  /** For a Deployment, StatefulSet or DaemonSet: ready and desired replicas, and the container images. */
+  replicas?: { ready: number; desired: number };
+  images?: string[];
   events?: KubeEvent[];
 }
 
+/**
+ * The FluxReport's `spec` (fluxcd.controlplane.io/v1, `api/v1/fluxreport_types.go` in
+ * controlplaneio-fluxcd/flux-operator). Stats are undefined when the report leaves them out, never 0.
+ */
 export interface FluxReportSummary {
+  id: string;
   name: string;
   namespace: string;
   distribution?: { version?: string; status?: string; entitlement?: string; managedBy?: string };
   components: Array<{ name: string; image?: string; ready: boolean; status?: string }>;
-  reconcilers: Array<{ kind: string; apiVersion?: string; running: number; failing: number; suspended: number }>;
+  reconcilers: Array<{
+    kind: string;
+    apiVersion?: string;
+    running?: number;
+    failing?: number;
+    suspended?: number;
+    totalSize?: string;
+  }>;
   sync?: { id?: string; path?: string; source?: string; status?: string; ready: boolean };
   operatorVersion?: string;
+  operatorPlatform?: string;
+  cluster?: { serverVersion?: string; platform?: string; nodes?: number };
+}
+
+/** The FluxInstance's spec and status (fluxcd.controlplane.io/v1, `api/v1/fluxinstance_types.go`). */
+export interface FluxInstanceSummary {
+  id: string;
+  /** `spec.distribution`: the version (semver range), registry and optional distribution artifact. */
+  version?: string;
+  registry?: string;
+  artifact?: string;
+  /** `spec.components`: the controllers it installs. */
+  components: string[];
+  /** `spec.sync`: the source Flux syncs the cluster from. */
+  sync?: { kind?: string; url?: string; ref?: string; path?: string };
+  lastAppliedRevision?: string;
+  lastAttemptedRevision?: string;
+  lastArtifactRevision?: string;
+  /** `status.components`: the images it applied. */
+  images: Array<{ name: string; repository?: string; tag?: string; digest?: string }>;
 }
 
 export interface Estate {
@@ -123,6 +158,7 @@ export interface Estate {
   /** The root: the FluxInstance (operator) or the root Kustomization, if found. */
   root?: string;
   report?: FluxReportSummary;
+  instance?: FluxInstanceSummary;
   /** Controllers: from the FluxReport, or from the Flux Deployments. */
   controllers: { ready: number; total: number };
   /** Which optional APIs answered (Flux Operator, image automation...). */
@@ -408,6 +444,12 @@ function workloadState(node: EstateNode, obj: KubeObject): void {
   }
   setState(node, mapWorkloadState(desired, ready, updated));
   node.note = `${ready}/${desired}`;
+  if (node.kind !== 'ReplicaSet') {
+    node.replicas = { ready, desired };
+    const containers = arr(rec(rec(rec(spec.template)?.spec))?.containers);
+    const images = containers.map((c) => str(rec(c)?.image)).filter((i): i is string => i !== undefined);
+    if (images.length > 0) node.images = images;
+  }
 }
 
 function matchesNamespaces(namespace: string, filter: string[] | undefined): boolean {
@@ -463,6 +505,7 @@ export function buildEstate(raw: RawEstate, options: BuildOptions = {}): Estate 
   const nodes = new Map<string, EstateNode>();
   const objects = new Map<string, KubeObject>();
   let report: FluxReportSummary | undefined;
+  let instance: FluxInstanceSummary | undefined;
   let operator = false;
   const now = options.now ?? Date.now();
 
@@ -479,7 +522,8 @@ export function buildEstate(raw: RawEstate, options: BuildOptions = {}): Estate 
         node.storage = str(rec(rec(obj.spec?.resources)?.requests)?.storage);
         node.note = node.storage;
       }
-      if (role === 'fluxreport') report = summariseReport(obj);
+      if (role === 'fluxreport') report = summariseReport(obj, node.id);
+      if (role === 'fluxinstance' && instance === undefined) instance = summariseInstance(obj, node.id);
       nodes.set(node.id, node);
       objects.set(node.id, obj);
     }
@@ -580,7 +624,7 @@ export function buildEstate(raw: RawEstate, options: BuildOptions = {}): Estate 
   }
 
   const root = findRoot(nodes, options.rootKustomization);
-  return { nodes, root, report, controllers: controllerCount(nodes, report), operator };
+  return { nodes, root, report, instance, controllers: controllerCount(nodes, report), operator };
 }
 
 function labelOwner(
@@ -648,11 +692,14 @@ function plainState(node: EstateNode, obj: KubeObject): void {
   }
 }
 
-function summariseReport(obj: KubeObject): FluxReportSummary {
+function summariseReport(obj: KubeObject, id: string): FluxReportSummary {
   const spec = obj.spec ?? {};
   const distribution = rec(spec.distribution);
   const sync = rec(spec.sync);
+  const operator = rec(spec.operator);
+  const cluster = rec(spec.cluster);
   return {
+    id,
     name: obj.metadata?.name ?? 'flux',
     namespace: obj.metadata?.namespace ?? '',
     distribution:
@@ -674,9 +721,10 @@ function summariseReport(obj: KubeObject): FluxReportSummary {
       return {
         kind: str(r.kind) ?? '?',
         apiVersion: str(r.apiVersion),
-        running: num(stats.running) ?? 0,
-        failing: num(stats.failing) ?? 0,
-        suspended: num(stats.suspended) ?? 0,
+        running: num(stats.running),
+        failing: num(stats.failing),
+        suspended: num(stats.suspended),
+        totalSize: str(stats.totalSize),
       };
     }),
     sync:
@@ -689,11 +737,48 @@ function summariseReport(obj: KubeObject): FluxReportSummary {
             status: str(sync.status),
             ready: sync.ready === true,
           },
-    operatorVersion: str(rec(spec.operator)?.version),
+    operatorVersion: str(operator?.version),
+    operatorPlatform: str(operator?.platform),
+    cluster:
+      cluster === undefined
+        ? undefined
+        : { serverVersion: str(cluster.serverVersion), platform: str(cluster.platform), nodes: num(cluster.nodes) },
   };
 }
 
-const FLUX_CONTROLLERS =
+function summariseInstance(obj: KubeObject, id: string): FluxInstanceSummary {
+  const spec = obj.spec ?? {};
+  const status = obj.status ?? {};
+  const distribution = rec(spec.distribution);
+  const sync = rec(spec.sync);
+  return {
+    id,
+    version: str(distribution?.version),
+    registry: str(distribution?.registry),
+    artifact: str(distribution?.artifact),
+    components: arr(spec.components)
+      .map((c) => str(c))
+      .filter((c): c is string => c !== undefined),
+    sync:
+      sync === undefined
+        ? undefined
+        : { kind: str(sync.kind), url: str(sync.url), ref: str(sync.ref), path: str(sync.path) },
+    lastAppliedRevision: str(status.lastAppliedRevision),
+    lastAttemptedRevision: str(status.lastAttemptedRevision),
+    lastArtifactRevision: str(status.lastArtifactRevision),
+    images: arr(status.components).map((c) => {
+      const r = rec(c) ?? {};
+      return {
+        name: str(r.name) ?? '?',
+        repository: str(r.repository),
+        tag: str(r.tag),
+        digest: str(r.digest),
+      };
+    }),
+  };
+}
+
+export const FLUX_CONTROLLERS =
   /^(source|kustomize|helm|notification|image-reflector|image-automation|source-watcher)-controller$/;
 
 function controllerCount(

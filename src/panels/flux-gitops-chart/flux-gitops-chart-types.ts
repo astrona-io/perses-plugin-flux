@@ -1,9 +1,9 @@
 import type { PanelProps } from '@perses-dev/plugin-system';
 import type { DatasourceSelector } from '@perses-dev/spec';
 
-export type FluxView = 'tree' | 'stages' | 'sources' | 'inventory' | 'list';
+export type FluxView = 'tree' | 'stages' | 'sources' | 'inventory' | 'list' | 'flux';
 
-export const FLUX_VIEWS: FluxView[] = ['tree', 'stages', 'sources', 'inventory', 'list'];
+export const FLUX_VIEWS: FluxView[] = ['tree', 'stages', 'sources', 'inventory', 'list', 'flux'];
 
 /** The panel's options; every field is optional and `withDefaults` fills them in. */
 export interface FluxGitOpsChartOptions {
