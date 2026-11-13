@@ -6,6 +6,7 @@ import { memo } from 'react';
 import type { EstateNode } from '../../model/estate';
 import type { FluxState } from '../../model/state';
 import { STATE_ICON, STATE_LABEL } from '../../model/state';
+import type { GroupSummary } from '../../model/views';
 import { MONO, hatch, kindAbbrev, kindPlural, stateColor, stateMotion } from './style';
 
 export type Overlay = 'target' | 'deleted' | 'failing' | 'losing' | 'kept';
@@ -21,10 +22,34 @@ export const OVERLAY_LABEL: Record<Overlay, string> = {
 export const CARD_W = 250;
 export const CARD_H = 56;
 
+export interface CardGroup {
+  /** Undefined for the leaves box, which mixes kinds. */
+  kind?: string;
+  count: number;
+  state: FluxState;
+  kinds: Array<{ kind: string; count: number }>;
+  summary: GroupSummary;
+}
+
+/** "13 ready, 2 failing, 1 suspended": the parts that are not zero. */
+export function summaryText(s: GroupSummary): string {
+  const parts: string[] = [];
+  if (s.ready > 0) parts.push(`${s.ready} ready`);
+  if (s.failing > 0) parts.push(`${s.failing} failing`);
+  if (s.suspended > 0) parts.push(`${s.suspended} suspended`);
+  if (s.other > 0) parts.push(`${s.other} other`);
+  return parts.join(', ');
+}
+
+export function groupName(group: Pick<CardGroup, 'kind' | 'count'>): string {
+  if (group.kind === undefined) return `${group.count} ${group.count === 1 ? 'resource' : 'resources'}`;
+  return `${group.count} ${group.count === 1 ? group.kind : kindPlural(group.kind)}`;
+}
+
 export interface NodeCardProps {
-  /** One object, or a group ("8 ServiceMonitors"). */
+  /** One object, or a group ("15 Kustomizations", or a parent's leaves: "12 resources"). */
   node?: EstateNode;
-  group?: { kind: string; count: number; state: FluxState };
+  group?: CardGroup;
   note?: string;
   selected?: boolean;
   overlay?: Overlay;
@@ -66,15 +91,23 @@ export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactEleme
   const kind = node?.kind ?? group?.kind ?? '';
   const state: FluxState = node?.state ?? group?.state ?? 'unknown';
   const color = stateColor(theme, state);
-  const name = node !== undefined ? node.name : `${group?.count ?? 0} ${kindPlural(kind)}`;
+  let name = '';
+  if (node !== undefined) name = node.name;
+  else if (group !== undefined) name = groupName(group);
+  let badgeSize = 11;
+  if (kind === 'HelmRelease') badgeSize = 18;
+  else if (group !== undefined && group.kind === undefined) badgeSize = 13;
   const dashed = state === 'disabled' || node?.live === false || group !== undefined;
   const overlayColor = overlayColorOf(theme, overlay);
   let borderColor = alpha(color, state === 'ready' ? 0.4 : 0.9);
   if (selected) borderColor = theme.palette.primary.main;
   if (overlayColor !== undefined) borderColor = overlayColor;
-  const label = `${kind} ${node?.namespace ? `${node.namespace}/` : ''}${name}: ${STATE_LABEL[state]}${node?.reason ? ` (${node.reason})` : ''}${
-    overlay ? `, ${OVERLAY_LABEL[overlay].slice(2)}` : ''
-  }`;
+  const label =
+    group !== undefined
+      ? `${name}: ${summaryText(group.summary)}`
+      : `${kind} ${node?.namespace ? `${node.namespace}/` : ''}${name}: ${STATE_LABEL[state]}${node?.reason ? ` (${node.reason})` : ''}${
+          overlay ? `, ${OVERLAY_LABEL[overlay].slice(2)}` : ''
+        }`;
   const where = node === undefined ? name : `${node.namespace ? `${node.namespace}/` : ''}${node.name} (${kind})`;
 
   return (
@@ -119,42 +152,46 @@ export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactEleme
             display: 'grid',
             placeItems: 'center',
             fontFamily: MONO,
-            fontSize: kind === 'HelmRelease' ? 18 : 11,
+            fontSize: badgeSize,
             fontWeight: 700,
             color: theme.palette.text.secondary,
             border: `1px solid ${theme.palette.divider}`,
             backgroundColor: theme.palette.action.hover,
           }}
         >
-          {kindAbbrev(kind)}
+          {group !== undefined && group.kind === undefined ? group.count : kindAbbrev(kind)}
         </Box>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1.3 }}>
-            {name}
-            {node?.protected === true && (
-              <Box
-                component="span"
-                title="prune: disabled (protected)"
-                aria-label="protected"
-                sx={{ ml: 0.5, color: theme.palette.success.main }}
-              >
-                🛡
+        {group !== undefined ? (
+          <GroupBody group={group} name={name} />
+        ) : (
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+              {name}
+              {node?.protected === true && (
+                <Box
+                  component="span"
+                  title="prune: disabled (protected)"
+                  aria-label="protected"
+                  sx={{ ml: 0.5, color: theme.palette.success.main }}
+                >
+                  🛡
+                </Box>
+              )}
+            </Typography>
+            <Typography
+              variant="caption"
+              noWrap
+              component="div"
+              sx={{ color: theme.palette.text.secondary, lineHeight: 1.3 }}
+            >
+              <Box component="span" sx={{ color, fontWeight: 600 }}>
+                <span className={state === 'reconciling' ? 'flux-spin' : undefined}>{STATE_ICON[state]}</span>{' '}
+                {STATE_LABEL[state]}
               </Box>
-            )}
-          </Typography>
-          <Typography
-            variant="caption"
-            noWrap
-            component="div"
-            sx={{ color: theme.palette.text.secondary, lineHeight: 1.3 }}
-          >
-            <Box component="span" sx={{ color, fontWeight: 600 }}>
-              <span className={state === 'reconciling' ? 'flux-spin' : undefined}>{STATE_ICON[state]}</span>{' '}
-              {STATE_LABEL[state]}
-            </Box>
-            {note ? ` · ${note}` : ''}
-          </Typography>
-        </Box>
+              {note ? ` · ${note}` : ''}
+            </Typography>
+          </Box>
+        )}
         <Typography
           aria-hidden
           sx={{
@@ -171,7 +208,7 @@ export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactEleme
             borderRadius: 0.5,
           }}
         >
-          {kind.toLowerCase()}
+          {group !== undefined ? 'group' : kind.toLowerCase()}
         </Typography>
         {overlay !== undefined && (
           <Typography
@@ -283,3 +320,74 @@ export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactEleme
     </Box>
   );
 });
+
+/** Most kind chips a leaves box shows before "+N". */
+const MAX_CHIPS = 4;
+
+/** A group card's text: its name, then the state counts (same-kind group) or kind chips (leaves box). */
+function GroupBody({ group, name }: { group: CardGroup; name: string }): ReactElement {
+  const theme = useTheme();
+  const { summary } = group;
+  const counts: Array<{ state: FluxState; n: number; word: string }> = [
+    { state: 'ready', n: summary.ready, word: 'ready' },
+    { state: summary.worst === 'ready' ? 'failed' : summary.worst, n: summary.failing, word: 'failing' },
+    { state: 'suspended', n: summary.suspended, word: 'suspended' },
+  ].filter((c) => c.n > 0) as Array<{ state: FluxState; n: number; word: string }>;
+  const chips = group.kinds.slice(0, MAX_CHIPS);
+  const more = group.kinds.length - chips.length;
+  return (
+    <Box sx={{ minWidth: 0, flex: 1 }}>
+      <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+        {name}
+        {group.kind === undefined &&
+          counts.map((c) => (
+            <Box
+              component="span"
+              key={c.state}
+              sx={{ ml: 0.75, fontWeight: 600, fontSize: 12, color: stateColor(theme, c.state) }}
+            >
+              {STATE_ICON[c.state]} {c.n}
+            </Box>
+          ))}
+      </Typography>
+      {group.kind !== undefined ? (
+        <Typography variant="caption" noWrap component="div" sx={{ lineHeight: 1.3 }}>
+          {counts.map((c, i) => (
+            <Box component="span" key={c.state} sx={{ color: stateColor(theme, c.state), fontWeight: 600 }}>
+              {i > 0 ? ' · ' : ''}
+              {STATE_ICON[c.state]} {c.n} {c.word}
+            </Box>
+          ))}
+        </Typography>
+      ) : (
+        <Box sx={{ display: 'flex', gap: 0.5, mt: 0.25, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          {chips.map((c) => (
+            <Box
+              component="span"
+              key={c.kind}
+              title={`${c.count} ${c.count === 1 ? c.kind : kindPlural(c.kind)}`}
+              sx={{
+                flex: '0 0 auto',
+                px: 0.5,
+                fontFamily: MONO,
+                fontSize: 10,
+                lineHeight: '15px',
+                borderRadius: 0.5,
+                color: theme.palette.text.secondary,
+                backgroundColor: theme.palette.action.hover,
+                border: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              {kindAbbrev(c.kind)} {c.count}
+            </Box>
+          ))}
+          {more > 0 && (
+            <Box component="span" sx={{ fontSize: 10, lineHeight: '17px', color: theme.palette.text.secondary }}>
+              +{more}
+            </Box>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+}

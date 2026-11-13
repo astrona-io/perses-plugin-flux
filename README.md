@@ -42,9 +42,17 @@ Six views, a header and a drawer:
   (marked ›) to open its page: that object and everything under it, from Kustomizations to HelmReleases and objects
   to everything Helm installed, down to ReplicaSets and Pods. A breadcrumb (`All resources › flux-system/apps ›
   observability`) leads back, one click per level; the "i" button on a card opens its drawer, and "Flux root" opens
-  the root Kustomization's (or FluxInstance's). Problem branches open, healthy ones collapsed; more objects of one
-  kind under one parent than `groupThreshold` are grouped ("8 ServiceMonitors"). Top to bottom by default, left to
-  right with the toggle or `treeDirection`. Cards keep their size and the tree scrolls.
+  the root Kustomization's (or FluxInstance's). Problem branches open, healthy ones collapsed. Under one parent,
+  objects with nothing below them collect in one box ("12 resources", with kind chips) once there are more than
+  `groupThreshold`; objects with their own children are grouped by kind ("15 Kustomizations", with a ready, failing
+  and suspended count) and stay together as branches. Failing objects are never folded away: they stay outside the
+  box, and a group with a failing member opens and turns red. No Flux object is dropped: one that manages itself
+  through a loop (a ResourceSet applied by a Kustomization it generates) is cut at one entry, and an object whose
+  parent cannot be found shows at the top level. A namespace selector ("All namespaces", or any of the namespaces
+  found) filters the Flux objects shown. Top to bottom by default, left to right with the toggle or
+  `treeDirection`. Pan and zoom: drag the canvas, wheel or pinch to zoom on the cursor, the toolbar's −, 100% and +
+  buttons and "Fit to view" (or double-click empty canvas), and the keys `+`, `−` and `0` (real size). A drag is
+  never taken as a click.
 - **Stages**: Kustomizations by their `dependsOn` depth, sources on the left. A failed stage marks what comes after
   it as waiting.
 - **Sources**: every source with what it feeds and delivers, and source chains ("defined in infra-controllers").
@@ -265,7 +273,7 @@ Every option is optional.
 | `showHelmReleases` | `true` | |
 | `onlyProblems` | `false` | keep only problems and the path to them |
 | `showPods` | `true` | |
-| `groupThreshold` | `2` | more objects of one kind under one parent are grouped (1 to 100) |
+| `groupThreshold` | `2` | more objects than this under one parent are grouped: leaves in one box, branches by kind (1 to 100) |
 | `historyRange` | the dashboard's time range | a duration, e.g. `6h`, `1d` |
 | `showHistory` | `true` | |
 | `fluxWebUIUrl` | none | e.g. `https://flux.example.com/resource/${kind}/${namespace}/${name}` |

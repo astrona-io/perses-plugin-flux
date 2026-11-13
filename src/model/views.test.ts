@@ -49,10 +49,11 @@ describe('layoutTree', () => {
     }
   });
 
-  it('groups same-kind siblings over the threshold', () => {
+  it('groups leaves over the threshold into one box', () => {
     const t = rootPage();
-    const group = t.cards.find((c) => c.group?.kind === 'ServiceMonitor');
-    expect(group?.group?.ids).toHaveLength(4);
+    const group = t.cards.find((c) => c.group?.kinds.some((k) => k.kind === 'ServiceMonitor'));
+    expect(group?.group?.kind).toBeUndefined();
+    expect(group?.group?.kinds.find((k) => k.kind === 'ServiceMonitor')?.count).toBe(4);
     const ungrouped = rootPage({ ...filters, groupThreshold: 10 });
     expect(ungrouped.cards.filter((c) => estate.nodes.get(c.nodeId ?? '')?.kind === 'ServiceMonitor')).toHaveLength(4);
   });
@@ -66,7 +67,7 @@ describe('layoutTree', () => {
       ]),
     );
     expect(t.cards.find((c) => c.nodeId === K('monitoring'))?.expanded).toBe(false);
-    expect(t.cards.some((c) => c.group?.kind === 'CustomResourceDefinition')).toBe(true);
+    expect(t.cards.some((c) => c.group?.kinds.some((k) => k.kind === 'CustomResourceDefinition'))).toBe(true);
   });
 
   it('only problems keeps the path to every problem and nothing healthy beside it', () => {
