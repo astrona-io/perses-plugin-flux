@@ -14,11 +14,14 @@ import {
 } from '@mui/material';
 import type { ReactElement, ReactNode } from 'react';
 
+import type { ChartUpdate } from '../../model/chart-updates';
+import { describeUpdate } from '../../model/chart-updates';
 import type { DeleteImpact } from '../../model/delete-impact';
 import { DELETE_LABEL, FAIL_LABEL, KEEP_LABEL, impactSummary, sortedDeleted } from '../../model/delete-impact';
 import type { Estate, EstateNode } from '../../model/estate';
 import { displayName } from '../../model/estate';
 import { STATE_ICON, STATE_LABEL, shortRevision } from '../../model/state';
+import { ChartUpdateLabel } from './ChartUpdate';
 import { commitLink, fluxWebLink } from './links';
 import { MONO, stateColor } from './style';
 
@@ -54,6 +57,8 @@ export interface DetailsProps {
   fluxWebUIUrl?: string;
   gitCommitUrl?: string;
   deleteEnabled: boolean;
+  /** For a HelmRelease, when the chart update check is on. */
+  chartUpdate?: ChartUpdate;
   onSelect: (id: string) => void;
   onInventory: (id: string) => void;
   onDelete: (id: string) => void;
@@ -69,6 +74,7 @@ export function Details(props: DetailsProps): ReactElement {
     fluxWebUIUrl,
     gitCommitUrl,
     deleteEnabled,
+    chartUpdate,
     onSelect,
     onInventory,
     onDelete,
@@ -160,6 +166,19 @@ export function Details(props: DetailsProps): ReactElement {
                   <TableCell sx={{ fontFamily: MONO }}>
                     {n.chart}
                     {n.chartVersion ? `@${n.chartVersion}` : ''}
+                  </TableCell>
+                </TableRow>
+              )}
+              {chartUpdate !== undefined && (
+                <TableRow>
+                  <TableCell>Chart update</TableCell>
+                  <TableCell>
+                    <ChartUpdateLabel update={chartUpdate} />
+                    {chartUpdate.status !== 'loading' && (
+                      <Typography variant="caption" component="div" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                        {describeUpdate(chartUpdate)}
+                      </Typography>
+                    )}
                   </TableCell>
                 </TableRow>
               )}

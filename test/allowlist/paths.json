@@ -6,6 +6,7 @@
     "/api/v1/namespaces/flux-system/persistentvolumeclaims",
     "/api/v1/namespaces/flux-system/pods",
     "/api/v1/namespaces/flux-system/services",
+    "/api/v1/namespaces/flux-system/services/source-controller:80/proxy/helmrepository/team-a1/podinfo/index-0f1e2d3c4b5a.yaml",
     "/api/v1/namespaces/team-a1/events",
     "/api/v1/namespaces/team-a1/persistentvolumeclaims",
     "/api/v1/namespaces/team-a1/pods",
