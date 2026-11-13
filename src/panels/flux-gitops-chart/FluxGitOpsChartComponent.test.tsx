@@ -74,14 +74,17 @@ describe('FluxGitOpsView', () => {
   it('renders 300 Kustomizations as real-size cards in a scroll box', () => {
     const { container } = renderView(data(buildEstate(raw(largeObjects(300, 2)))), { onlyProblems: false });
     const tree = screen.getByRole('tree');
-    // Healthy branches start collapsed, so every Kustomization is one card and nothing is shrunk.
+    // The top level is one card per Kustomization, nothing is shrunk, and the tree's box scrolls.
     expect(within(tree).getAllByRole('treeitem').length).toBeGreaterThanOrEqual(300);
-    expect(Number(tree.querySelector('svg')?.getAttribute('height'))).toBeGreaterThan(300 * 70);
+    expect(screen.getByTestId('flux-tree-scroll')).toContainElement(tree);
     expect(container.querySelector('[data-testid="flux-main"]')).toBeInTheDocument();
   });
 
   it('expands and collapses a branch', () => {
     renderView(data(stagedEstate()));
+    // Top-level cards drill into their own page; the breadcrumb leads back.
+    fireEvent.click(screen.getByRole('button', { name: /Kustomization flux-system\/infra-controllers: / }));
+    expect(screen.getByRole('navigation', { name: 'Tree path' })).toHaveTextContent('flux-system/infra-controllers');
     const before = screen.getAllByRole('treeitem').length;
     const expand = screen.getAllByRole('button', { name: /^Expand / })[0] as HTMLElement;
     fireEvent.click(expand);
@@ -90,7 +93,7 @@ describe('FluxGitOpsView', () => {
 
   it('opens the details drawer and closes it with Escape', () => {
     renderView(data(stagedEstate()));
-    fireEvent.click(screen.getByRole('button', { name: /Kustomization flux-system\/apps: Waiting/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Details of flux-system/apps (Kustomization)' }));
     const drawer = screen.getByRole('complementary', { name: 'Details' });
     expect(within(drawer).getByText("dependency 'flux-system/monitoring' is not ready")).toBeInTheDocument();
     fireEvent.keyDown(drawer, { key: 'Escape' });
@@ -99,6 +102,8 @@ describe('FluxGitOpsView', () => {
 
   it('delete mode marks the cascade and opens the report', () => {
     renderView(data(stagedEstate()));
+    // Open infra-configs' page so its children are on screen, then pick it as the delete target.
+    fireEvent.click(screen.getByRole('button', { name: /Kustomization flux-system\/infra-configs/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'What if I delete…?' }));
     fireEvent.click(screen.getByRole('button', { name: /Kustomization flux-system\/infra-configs/ }));
     const report = screen.getByRole('complementary', { name: 'Delete report' });

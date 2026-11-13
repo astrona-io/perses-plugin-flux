@@ -16,9 +16,10 @@ import {
   childIndex,
   computeKpis,
   layoutTree,
+  treePath,
 } from '../../model/views';
 import { DeleteReport, Details } from './Drawer';
-import type { FluxGitOpsChartProps, FluxView, ResolvedOptions } from './flux-gitops-chart-types';
+import type { FluxGitOpsChartProps, FluxView, ResolvedOptions, TreeDirection } from './flux-gitops-chart-types';
 import { withDefaults } from './flux-gitops-chart-types';
 import { FluxResourcesTab } from './FluxResourcesView';
 import { KpiTiles, Legend, Toolbar } from './Header';
@@ -38,7 +39,7 @@ export function FluxGitOpsChartComponent(props: FluxGitOpsChartProps): ReactElem
   const options = useMemo(() => withDefaults(props.spec), [props.spec]);
   const data = useFluxData(options);
   // The view seeds its state (tab, toggles) from these options; remount it when the editor changes them.
-  const seed = `${options.defaultView}|${options.showSources}|${options.showHelmReleases}|${options.onlyProblems}`;
+  const seed = `${options.defaultView}|${options.showSources}|${options.showHelmReleases}|${options.onlyProblems}|${options.treeDirection}`;
   return <FluxGitOpsView key={seed} options={options} data={data} width={props.contentDimensions?.width} />;
 }
 
@@ -88,6 +89,9 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
   const [deleteTarget, setDeleteTarget] = useState<string>();
   const [inventoryId, setInventoryId] = useState<string>();
   const [expanded, setExpanded] = useState<Map<string, boolean>>(new Map());
+  // The tree page: undefined is the top level, else the object drilled into.
+  const [treeFocus, setTreeFocus] = useState<string>();
+  const [treeDirection, setTreeDirection] = useState<TreeDirection>(options.treeDirection);
 
   const viewFilters: ViewFilters = useMemo(
     () => ({ ...filters, showPods: options.showPods, groupThreshold: options.groupThreshold }),
@@ -98,8 +102,15 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
     () =>
       estate === undefined || children === undefined || view !== 'tree'
         ? undefined
-        : layoutTree(estate, viewFilters, expanded, children),
-    [estate, children, viewFilters, expanded, view],
+        : layoutTree(estate, viewFilters, expanded, children, treeFocus),
+    [estate, children, viewFilters, expanded, view, treeFocus],
+  );
+  const treeCrumbs = useMemo(
+    () =>
+      estate === undefined || children === undefined || tree?.focus === undefined
+        ? []
+        : treePath(estate, tree.focus, children),
+    [estate, children, tree],
   );
   const stages = useMemo(() => (estate === undefined ? undefined : buildStages(estate, filters)), [estate, filters]);
   const sources = useMemo(
@@ -219,6 +230,10 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
               selected={selected}
               overlays={overlays}
               onSelect={onSelect}
+              onOpenInTree={(id) => {
+                setTreeFocus(id);
+                setView('tree');
+              }}
             />
           )
         );
@@ -266,10 +281,15 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
             <TreeView
               estate={estate}
               layout={tree}
+              path={treeCrumbs}
+              direction={treeDirection}
               selected={selected}
               overlays={overlays}
+              drill={!deleteMode}
               onSelect={onSelect}
               onToggle={onToggle}
+              onFocus={setTreeFocus}
+              onDirection={setTreeDirection}
             />
           )
         );
@@ -344,6 +364,8 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
             setDeleteTarget(undefined);
             setSelected(undefined);
             setInventoryId(undefined);
+            setTreeFocus(undefined);
+            setTreeDirection(options.treeDirection);
             setFilters({
               showSources: options.showSources,
               showHelmReleases: options.showHelmReleases,

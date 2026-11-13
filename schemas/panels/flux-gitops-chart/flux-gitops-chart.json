@@ -6,6 +6,7 @@
     "cluster": "$cluster",
     "rootKustomization": "auto",
     "defaultView": "tree",
+    "treeDirection": "vertical",
     "showSources": true,
     "showHelmReleases": true,
     "onlyProblems": false,

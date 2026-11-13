@@ -13,7 +13,7 @@ Kubernetes v1.37.0.
 | `dev/docker-compose.yaml` | `dev/up.sh <profile>`: a kind cluster per profile | Flux, the Flux Operator and kube-state-metrics need a real API server, CRDs and controllers. A compose file with a fake-data generator could not show real conditions, inventories, Helm drift or events. The kind clusters run under podman (`KIND_EXPERIMENTAL_PROVIDER=podman`). |
 | Fake-data generator | A real fleet pushed as OCI artifacts to a local registry, plus `dev/push-commit.sh` | The states come from the controllers themselves. `push-commit.sh <profile> healthy\|broken\|bump` pushes a new commit so the states change. |
 | Grafana migration | None | Part 1 names no Grafana equivalent. Flux's Grafana dashboards are time series and tables over the same metrics, not a resource tree. |
-| Reuse servicegraph's graph and pan/zoom | Own left-to-right tree layout at real size in a scroll box | The spec asks for "real size with horizontal scroll, not shrunk". servicegraph lays out a force/ELK graph and zooms it to fit, which shrinks cards. A tree layout is a few dozen lines (`src/model/views.ts`, `layoutTree`) and stays testable as a pure function. |
+| Reuse servicegraph's graph and pan/zoom | Own tree layout at real size in a scroll box, top to bottom by default, left to right as an option | The spec asks for "real size with horizontal scroll, not shrunk". servicegraph lays out a force/ELK graph and zooms it to fit, which shrinks cards. A tree layout is a few dozen lines (`src/model/views.ts`, `layoutTree`) and stays testable as a pure function. See [Tree navigation](#tree-navigation). |
 | Reuse statetimeline for the history strip | Own small SVG strip (`HistoryStrip.tsx`) | statetimeline is a panel plugin, not an exported component, and needs its own query. The strip draws Ready bands and revision markers (◆) per Kustomization from one Prometheus query. |
 | Optional query plugin | None | The panel reads both datasources directly: the Kubernetes datasource's list client and Prometheus via `useDatasourceClient`. No new datasource or query kind was needed. |
 
@@ -187,8 +187,40 @@ on HelmRelease and HelmChart (upstream already has `revision` and `source_name` 
 - **Prometheus is queried with `useDatasourceClient`**, not `useTimeSeriesQueries`, because the panel has no query
   editor: both datasources are options of the panel.
 - **The datasource pickers exclude variables**: the panel needs one concrete datasource of each kind.
-- **The view remounts when an option that seeds state changes** (`defaultView`, `onlyProblems`, the filters), so the
-  editor preview follows the options.
+- **The view remounts when an option that seeds state changes** (`defaultView`, `treeDirection`, `onlyProblems`, the
+  filters), so the editor preview follows the options.
+
+## Tree navigation
+
+One big tree of a whole fleet was hard to read, so the tree tab is a set of pages with a breadcrumb.
+
+- **The first page is the top-level Flux objects**: every Flux object (source, Kustomization, HelmRelease,
+  ResourceSet, input provider) that no other Flux object manages. "Managed" is the same parent the tree always used:
+  inventory (`managedBy`), then ownerReferences. The "start" (the root Kustomization, the FluxInstance, and the
+  Kustomization(s) the FluxInstance syncs, which apply everything else) is not a card: on a Flux Operator cluster the
+  FluxInstance would otherwise be the only card on the first page. Objects the start applies count as top level.
+  FluxReports are never cards. `topLevel` and `treePath` in `src/model/views.ts` hold the rules.
+- **The start stays reachable**: a "Flux root" link in the tree bar opens its drawer (and, in delete mode, picks it
+  as the target), so the root's inventory and delete impact are still one click away.
+- **The first page is a wrapping grid, not a tree**: there are no edges between top-level objects, and a grid shows
+  many more of them per screen in both directions. Each card says how many objects are under it.
+- **Clicking a card with children opens its page**: that object at the top, always open, and its children laid out as
+  before (problem branches open, healthy ones collapsed, grouping, filters). A card that opens a page has a "›" and
+  its accessible name ends in "open its page". The breadcrumb ("All resources › flux-system/apps › observability")
+  lists the parents up to the start; every crumb is a button back to that page, the last is `aria-current="page"`.
+- **The drawer moved to an "i" button on cards that open a page** ("Details of flux-system/apps (Kustomization)").
+  Clicking the card navigates, which is the common action; the button keeps the drawer one click away, is a real
+  `<button>` in the tab order, and works with Enter and Space. Cards without children still open the drawer on click.
+  In delete mode pages do not open: a click picks the delete target, as before, and the breadcrumb still works.
+- **A source's page shows what uses it**: the Kustomizations and HelmReleases whose `sourceRef` points at it, one
+  level unfolded. A source has no children in the ownership tree, so without this its page would be empty.
+- **Sources tab, double-click a row** to open that source's page in the tree tab. Double-click is not reachable from a
+  keyboard, so each row also has a "Show in tree ›" button with the same effect. A single click still opens the
+  drawer.
+- **Direction is a view choice, not a layout choice.** `layoutTree` returns depth (level) and leaf slot (row) only;
+  `TreeView` maps them to x/y. Top to bottom (`treeDirection: vertical`) is the default; left to right stays
+  available as a toggle in the tree bar and as the option. Cards keep their size in both directions and the box
+  scrolls.
 - **Module federation shares what the percli scaffold shares** (React, `@emotion/*`, the `@perses-dev/*` packages);
   MUI is bundled, as in the upstream plugins. The theme reaches the panel through the shared emotion context.
 

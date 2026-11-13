@@ -5,6 +5,11 @@ export type FluxView = 'tree' | 'stages' | 'sources' | 'inventory' | 'list' | 'f
 
 export const FLUX_VIEWS: FluxView[] = ['tree', 'stages', 'sources', 'inventory', 'list', 'flux'];
 
+/** Tree direction: parents above their children (vertical) or left of them (horizontal). */
+export type TreeDirection = 'vertical' | 'horizontal';
+
+export const TREE_DIRECTIONS: TreeDirection[] = ['vertical', 'horizontal'];
+
 /** The panel's options; every field is optional and `withDefaults` fills them in. */
 export interface FluxGitOpsChartOptions {
   kubernetesDatasource?: DatasourceSelector;
@@ -13,6 +18,7 @@ export interface FluxGitOpsChartOptions {
   namespaces?: string[];
   rootKustomization?: string;
   defaultView?: FluxView;
+  treeDirection?: TreeDirection;
   showSources?: boolean;
   showHelmReleases?: boolean;
   onlyProblems?: boolean;
@@ -41,6 +47,7 @@ export const DEFAULT_OPTIONS = {
   namespaces: [] as string[],
   rootKustomization: 'auto',
   defaultView: 'tree' as FluxView,
+  treeDirection: 'vertical' as TreeDirection,
   showSources: true,
   showHelmReleases: true,
   onlyProblems: false,
@@ -58,6 +65,7 @@ export function withDefaults(options: FluxGitOpsChartOptions | undefined): Resol
     namespaces: o.namespaces ?? DEFAULT_OPTIONS.namespaces,
     rootKustomization: o.rootKustomization ?? DEFAULT_OPTIONS.rootKustomization,
     defaultView: o.defaultView ?? DEFAULT_OPTIONS.defaultView,
+    treeDirection: o.treeDirection ?? DEFAULT_OPTIONS.treeDirection,
     showSources: o.showSources ?? DEFAULT_OPTIONS.showSources,
     showHelmReleases: o.showHelmReleases ?? DEFAULT_OPTIONS.showHelmReleases,
     onlyProblems: o.onlyProblems ?? DEFAULT_OPTIONS.onlyProblems,
