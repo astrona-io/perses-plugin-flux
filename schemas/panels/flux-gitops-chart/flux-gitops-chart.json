@@ -1,0 +1,19 @@
+{
+  "kind": "FluxGitOpsChart",
+  "spec": {
+    "kubernetesDatasource": { "kind": "KubernetesDatasource", "name": "cluster" },
+    "prometheusDatasource": { "kind": "PrometheusDatasource" },
+    "cluster": "$cluster",
+    "rootKustomization": "auto",
+    "defaultView": "tree",
+    "showSources": true,
+    "showHelmReleases": true,
+    "onlyProblems": false,
+    "showPods": true,
+    "groupThreshold": 2,
+    "showHistory": true,
+    "fluxWebUIUrl": "https://flux.example.com/resource/${kind}/${namespace}/${name}",
+    "gitCommitUrl": "https://${repo}/commit/${revision}",
+    "enableDeleteImpact": true
+  }
+}

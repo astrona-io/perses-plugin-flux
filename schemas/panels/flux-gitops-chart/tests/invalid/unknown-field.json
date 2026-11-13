@@ -1,0 +1,4 @@
+{
+  "kind": "FluxGitOpsChart",
+  "spec": { "legend": { "position": "bottom" } }
+}

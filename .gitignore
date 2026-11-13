@@ -1,0 +1,28 @@
+.idea/
+
+# Local
+.DS_Store
+*.local
+*.log*
+
+# Dist
+node_modules
+dist/
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# generated archives
+*.tar.gz
+
+# external CUE dependencies
+/cue.mod/pkg/
+
+# archive checksums written by the release workflow
+*.sha256
+
+# dev stack: plugin archives and per-profile state (kubeconfig, rendered files, fleet repository)
+dev/archive/
+dev/.state/

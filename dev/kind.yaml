@@ -1,0 +1,25 @@
+# kind cluster for the dev stack (podman provider). up.sh fills in the cluster name, the host ports and
+# __DEV_DIR__ (this directory's absolute path): the plugin archives and the Perses provisioning files reach
+# the Perses pod through these mounts. Every host port listens on 127.0.0.1 only.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: __CLUSTER__
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30090 # Perses (k8s/perses.yaml)
+        hostPort: __PERSES_PORT__
+        listenAddress: 127.0.0.1
+      - containerPort: 30500 # OCI registry the fleet is pushed to (k8s/registry.yaml)
+        hostPort: __REGISTRY_PORT__
+        listenAddress: 127.0.0.1
+      - containerPort: 30080 # Flux Operator web UI (operator profile only)
+        hostPort: __FLUX_WEB_PORT__
+        listenAddress: 127.0.0.1
+    extraMounts:
+      - hostPath: __DEV_DIR__/archive
+        containerPath: /dev-stack/archive
+        readOnly: true
+      - hostPath: __PROVISIONING_DIR__
+        containerPath: /dev-stack/provisioning
+        readOnly: true

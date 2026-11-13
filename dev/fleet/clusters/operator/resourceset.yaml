@@ -1,0 +1,33 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSet
+metadata:
+  name: team-sandboxes
+  namespace: flux-system
+spec:
+  inputs:
+    - tenant: team-a
+      replicas: 1
+    - tenant: team-b
+      replicas: 2
+  resources:
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: << inputs.tenant >>
+    - apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: sandbox
+        namespace: << inputs.tenant >>
+      spec:
+        replicas: << inputs.replicas >>
+        selector:
+          matchLabels: { app: sandbox }
+        template:
+          metadata:
+            labels: { app: sandbox }
+          spec:
+            containers:
+              - name: podinfo
+                image: ghcr.io/stefanprodan/podinfo:6.7.1
+                resources: { requests: { cpu: 5m, memory: 16Mi } }

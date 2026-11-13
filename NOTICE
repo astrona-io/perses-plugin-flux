@@ -1,0 +1,9 @@
+Copyright 2026 Astrona
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It includes or is built from the following third-party material:
+
+- Perses spec CUE schemas (https://github.com/perses/spec), vendored into the
+  plugin archive at build time. Apache License 2.0, Copyright The Perses
+  Authors.

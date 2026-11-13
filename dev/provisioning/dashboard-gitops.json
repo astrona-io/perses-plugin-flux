@@ -1,0 +1,66 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "gitops",
+    "project": "flux"
+  },
+  "spec": {
+    "display": {
+      "name": "Flux GitOps"
+    },
+    "duration": "1h",
+    "refreshInterval": "30s",
+    "variables": [],
+    "panels": {
+      "flux": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Flux GitOps",
+            "description": "Every Flux object in the dev cluster: click a card for details, or turn on \"What if I delete\u2026?\"."
+          },
+          "plugin": {
+            "kind": "FluxGitOpsChart",
+            "spec": {
+              "kubernetesDatasource": {
+                "kind": "KubernetesDatasource",
+                "name": "kubernetes"
+              },
+              "prometheusDatasource": {
+                "kind": "PrometheusDatasource",
+                "name": "prometheus"
+              },
+              "cluster": "dev",
+              "defaultView": "tree",
+              "showHistory": true,
+              "historyRange": "1h",
+              "showSources": true,
+              "showHelmReleases": true,
+              "showPods": true,
+              "enableDeleteImpact": true,
+              "fluxWebUIUrl": "__FLUX_WEB_URL__/resource/${kind}/${namespace}/${name}"
+            }
+          }
+        }
+      }
+    },
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 24,
+              "height": 34,
+              "content": {
+                "$ref": "#/spec/panels/flux"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

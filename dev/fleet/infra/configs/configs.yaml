@@ -1,0 +1,34 @@
+# Namespaces for the later stages (deleting infra-configs reaches into them), a Widget that needs the CRD
+# from infra-crds, a protected Namespace and an object the controller leaves alone.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: example.com/v1
+kind: Widget
+metadata:
+  name: default
+  namespace: widget-system
+  annotations:
+    example.com/commit: '__COMMIT__' # dev/push-commit.sh bump changes it
+spec:
+  size: small
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: legacy-gateway
+  namespace: widget-system
+  annotations:
+    kustomize.toolkit.fluxcd.io/reconcile: disabled
+spec:
+  selector: { app: legacy-gateway }
+  ports: [{ port: 80, targetPort: 8080 }]

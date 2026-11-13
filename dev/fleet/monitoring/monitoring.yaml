@@ -1,0 +1,56 @@
+# The Helm release dev/push-commit.sh breaks on purpose (an image tag that does not exist), and a
+# StatefulSet whose PVC the StatefulSet controller creates: deleting this stage loses that data.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: metrics-gateway
+  namespace: monitoring
+spec:
+  interval: 1m
+  timeout: 45s
+  chart:
+    spec:
+      chart: podinfo
+      version: '6.7.1'
+      sourceRef: { kind: HelmRepository, name: podinfo, namespace: flux-system }
+  values:
+    replicaCount: 1
+    image:
+      tag: __METRICS_GATEWAY_TAG__
+    resources: { requests: { cpu: 5m, memory: 16Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-store
+  namespace: monitoring
+spec:
+  clusterIP: None
+  selector: { app: metrics-store }
+  ports: [{ port: 9898 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: metrics-store
+  namespace: monitoring
+spec:
+  serviceName: metrics-store
+  replicas: 1
+  selector:
+    matchLabels: { app: metrics-store }
+  template:
+    metadata:
+      labels: { app: metrics-store }
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          resources: { requests: { cpu: 5m, memory: 16Mi } }
+          volumeMounts: [{ name: data, mountPath: /data }]
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 64Mi } }

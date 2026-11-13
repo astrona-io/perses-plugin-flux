@@ -1,0 +1,13 @@
+{
+  "kind": "FluxGitOpsChart",
+  "spec": {
+    "namespaces": ["flux-system", "apps"],
+    "rootKustomization": "flux-system/flux-system",
+    "defaultView": "stages",
+    "onlyProblems": true,
+    "showPods": false,
+    "groupThreshold": 5,
+    "historyRange": "6h",
+    "enableDeleteImpact": false
+  }
+}

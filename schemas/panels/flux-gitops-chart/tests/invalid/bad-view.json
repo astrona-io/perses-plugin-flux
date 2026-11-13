@@ -1,0 +1,4 @@
+{
+  "kind": "FluxGitOpsChart",
+  "spec": { "defaultView": "graph" }
+}

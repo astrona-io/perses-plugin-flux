@@ -1,0 +1,39 @@
+# Flux Operator profile: the operator installs Flux and the sync source from this FluxInstance.
+# FluxInstance.spec.sync has no `insecure` field, so a kustomize patch sets it on the generated
+# OCIRepository (the dev registry is plain HTTP).
+apiVersion: fluxcd.controlplane.io/v1
+kind: FluxInstance
+metadata:
+  name: flux
+  namespace: flux-system
+spec:
+  distribution:
+    version: '2.10.x'
+    registry: ghcr.io/fluxcd
+  components: [source-controller, kustomize-controller, helm-controller, notification-controller]
+  cluster:
+    type: kubernetes
+  sync:
+    kind: OCIRepository
+    url: oci://registry.registry.svc.cluster.local:5000/fleet
+    ref: latest
+    path: clusters/operator
+  kustomize:
+    patches:
+      - target: { kind: OCIRepository }
+        patch: |
+          - op: add
+            path: /spec/insecure
+            value: true
+---
+# The Flux Operator web UI on http://127.0.0.1:<flux web port>.
+apiVersion: v1
+kind: Service
+metadata:
+  name: flux-web-dev
+  namespace: flux-system
+spec:
+  type: NodePort
+  selector: { app.kubernetes.io/name: flux-operator }
+  ports:
+    - { port: 9080, targetPort: 9080, nodePort: 30080 }

@@ -1,0 +1,99 @@
+# The staged setup: crds -> controllers -> configs -> monitoring -> apps, and tenants (suspended).
+# dev/push-commit.sh renders __SUSPEND_TENANTS__ and pushes this folder as an OCI artifact.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infra-crds
+  namespace: flux-system
+spec:
+  interval: 1m
+  retryInterval: 20s
+  path: ./infra/crds
+  prune: true
+  sourceRef:
+    kind: OCIRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infra-controllers
+  namespace: flux-system
+spec:
+  interval: 1m
+  retryInterval: 20s
+  path: ./infra/controllers
+  prune: true
+  sourceRef:
+    kind: OCIRepository
+    name: flux-system
+  dependsOn:
+    - name: infra-crds
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infra-configs
+  namespace: flux-system
+spec:
+  interval: 1m
+  retryInterval: 20s
+  path: ./infra/configs
+  prune: true
+  sourceRef:
+    kind: OCIRepository
+    name: flux-system
+  dependsOn:
+    - name: infra-controllers
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: monitoring
+  namespace: flux-system
+spec:
+  interval: 1m
+  retryInterval: 20s
+  path: ./monitoring
+  prune: true
+  sourceRef:
+    kind: OCIRepository
+    name: flux-system
+  dependsOn:
+    - name: infra-configs
+  wait: true
+  timeout: 90s
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: apps
+  namespace: flux-system
+spec:
+  interval: 1m
+  retryInterval: 20s
+  path: ./apps
+  prune: true
+  sourceRef:
+    kind: OCIRepository
+    name: flux-system
+  dependsOn:
+    - name: monitoring
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: tenants
+  namespace: flux-system
+spec:
+  interval: 1m
+  retryInterval: 20s
+  path: ./tenants
+  prune: true
+  sourceRef:
+    kind: OCIRepository
+    name: flux-system
+  dependsOn:
+    - name: infra-configs
+  suspend: __SUSPEND_TENANTS__

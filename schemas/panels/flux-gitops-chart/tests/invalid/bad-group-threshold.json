@@ -1,0 +1,4 @@
+{
+  "kind": "FluxGitOpsChart",
+  "spec": { "groupThreshold": 0 }
+}

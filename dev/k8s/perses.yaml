@@ -1,0 +1,89 @@
+# Perses in the cluster, reading the API server through its own service account (RBAC: deploy/rbac.yaml)
+# and Prometheus in the prometheus namespace. Reached on http://127.0.0.1:<perses port> through the kind
+# port mapping. The proxy refuses private addresses by default, so allowed_networks lists the service CIDR
+# (kind's default 10.96.0.0/16: the API server and Prometheus).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: perses
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: perses
+  namespace: perses
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: perses-config
+  namespace: perses
+data:
+  config.yaml: |
+    database:
+      file:
+        folder: /var/lib/perses
+    security:
+      enable_auth: false
+      # Lets a secret point at the pod's service account token and CA. Nothing else can be read.
+      secret_file_allowed_directories:
+        - /var/run/secrets/kubernetes.io/serviceaccount
+    datasource:
+      proxy:
+        allowed_networks:
+          - 10.96.0.1/32 # the API server's service IP: the /16 alone does not allow it in Perses v0.55.1
+          - 10.96.0.0/16
+    plugin:
+      archive_paths:
+        - /etc/perses/plugins-archive
+        - /etc/perses/plugins-archive-kubernetes
+        - /etc/perses/plugins-archive-flux
+    provisioning:
+      interval: 10s
+      folders:
+        - /etc/perses/provisioning
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: perses
+  namespace: perses
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: perses } }
+  template:
+    metadata:
+      labels: { app: perses }
+    spec:
+      serviceAccountName: perses
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: perses
+          image: docker.io/persesdev/perses:v0.55.1
+          args: ['--config', '/etc/perses/config/config.yaml']
+          ports: [{ containerPort: 8080, name: http }]
+          readinessProbe:
+            httpGet: { path: /api/v1/health, port: http }
+          volumeMounts:
+            - { name: config, mountPath: /etc/perses/config }
+            - { name: data, mountPath: /var/lib/perses }
+            - { name: provisioning, mountPath: /etc/perses/provisioning, readOnly: true }
+            - { name: kubernetes-plugin, mountPath: /etc/perses/plugins-archive-kubernetes, readOnly: true }
+            - { name: flux-plugin, mountPath: /etc/perses/plugins-archive-flux, readOnly: true }
+      volumes:
+        - { name: config, configMap: { name: perses-config } }
+        - { name: data, emptyDir: {} }
+        - { name: provisioning, hostPath: { path: /dev-stack/provisioning, type: Directory } }
+        - { name: kubernetes-plugin, hostPath: { path: /dev-stack/archive/kubernetes, type: Directory } }
+        - { name: flux-plugin, hostPath: { path: /dev-stack/archive/flux, type: Directory } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: perses
+  namespace: perses
+spec:
+  type: NodePort
+  selector: { app: perses }
+  ports:
+    - { port: 8080, targetPort: http, nodePort: 30090 }

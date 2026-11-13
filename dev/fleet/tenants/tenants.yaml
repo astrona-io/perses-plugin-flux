@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant-portal
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: tenant-portal }
+  template:
+    metadata:
+      labels: { app: tenant-portal }
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          resources: { requests: { cpu: 5m, memory: 16Mi } }

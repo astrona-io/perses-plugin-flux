@@ -1,0 +1,61 @@
+# Read-only access for the Flux GitOps panel.
+#
+# The panel reads through the Kubernetes datasource (astrona-io/perses-plugin-kubernetes), so this is
+# granted to the service account Perses talks to the API server as (in-cluster: its pod's own). It adds
+# to the datasource's own ClusterRole (perses-kubernetes-datasource in that repo's deploy/rbac.yaml),
+# which already covers namespaces, nodes, pods, events and the apps workloads. The ones this panel
+# reads (not nodes) are repeated here so this file works on its own.
+#
+#   - verbs get and list only: never watch, create, update, patch or delete;
+#   - no secrets, configmaps or serviceaccounts (objects of those kinds in an inventory show as
+#     "not read", see docs/DECISIONS.md);
+#   - no subresources (status, log, exec, proxy).
+#
+# The Flux Operator rule is harmless when the operator is not installed. Change `perses` / `perses`
+# (service account / namespace) to where Perses runs.
+#
+#   kubectl apply -f deploy/rbac.yaml
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: perses-flux-gitops-panel
+  labels:
+    app.kubernetes.io/name: perses-plugin-flux
+rules:
+  # Flux
+  - apiGroups: [source.toolkit.fluxcd.io]
+    resources: [gitrepositories, ocirepositories, helmrepositories, helmcharts, buckets]
+    verbs: [get, list]
+  - apiGroups: [kustomize.toolkit.fluxcd.io]
+    resources: [kustomizations]
+    verbs: [get, list]
+  - apiGroups: [helm.toolkit.fluxcd.io]
+    resources: [helmreleases]
+    verbs: [get, list]
+  # Flux Operator
+  - apiGroups: [fluxcd.controlplane.io]
+    resources: [fluxinstances, fluxreports, resourcesets, resourcesetinputproviders]
+    verbs: [get, list]
+  # Objects in inventories and the workloads under them, plus events for the drawer
+  - apiGroups: ['']
+    resources: [namespaces, pods, services, persistentvolumeclaims, events]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets, replicasets]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: perses-flux-gitops-panel
+  labels:
+    app.kubernetes.io/name: perses-plugin-flux
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: perses-flux-gitops-panel
+subjects:
+  - kind: ServiceAccount
+    name: perses
+    namespace: perses
