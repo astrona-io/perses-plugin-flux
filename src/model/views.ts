@@ -12,6 +12,8 @@ export interface ViewFilters {
   onlyProblems: boolean;
   showPods: boolean;
   groupThreshold: number;
+  /** Only Flux objects in these namespaces (cluster-scoped ones always pass). Empty: all. */
+  namespaces?: readonly string[];
 }
 
 /** Direct children of a node in the tree: what it applied, plus what its ownerReferences point at. */
@@ -31,7 +33,66 @@ export function childIndex(estate: Estate): Map<string, string[]> {
       else if (estate.root !== undefined && n.role !== undefined && n.role !== 'fluxreport') add(estate.root, n.id);
     }
   }
+  breakCycles(estate, children);
   return children;
+}
+
+/** Which member of a management loop becomes its entry: generators first, then Kustomizations. */
+const ENTRY_RANK: Partial<Record<string, number>> = {
+  fluxinstance: 0,
+  resourceset: 1,
+  kustomization: 2,
+  helmrelease: 3,
+};
+
+/**
+ * A GitOps repository that manages itself is a loop: a Kustomization applies the ResourceSet that generates
+ * the Kustomization. Every member then has a parent and none is at the top, so the whole loop and all it
+ * applies would vanish from the tree. Each loop is cut above one entry (a FluxInstance or ResourceSet if the
+ * loop has one, else a Kustomization), which then has no parent and shows at the top level.
+ */
+function breakCycles(estate: Estate, children: Map<string, string[]>): void {
+  const parents = parentIndex(children);
+  const done = new Set<string>();
+  for (const start of parents.keys()) {
+    const path: string[] = [];
+    const onPath = new Map<string, number>();
+    let current: string | undefined = start;
+    while (current !== undefined && !done.has(current) && !onPath.has(current)) {
+      onPath.set(current, path.length);
+      path.push(current);
+      current = parents.get(current);
+    }
+    if (current !== undefined && onPath.has(current)) {
+      const loop = path.slice(onPath.get(current));
+      const rank = (id: string): number => ENTRY_RANK[estate.nodes.get(id)?.role ?? ''] ?? 9;
+      const better = (a: string, b: string): boolean =>
+        (rank(a) - rank(b) || compareNodes(estate.nodes.get(a), estate.nodes.get(b))) < 0;
+      const entry = loop.reduce((best, id) => (better(id, best) ? id : best));
+      const parent = parents.get(entry) as string;
+      children.set(
+        parent,
+        (children.get(parent) ?? []).filter((c) => c !== entry),
+      );
+      parents.delete(entry);
+    }
+    for (const id of path) done.add(id);
+  }
+}
+
+/** Whether a node passes the namespace selection: Flux objects only; cluster-scoped and plain objects always do. */
+export function inNamespaces(n: EstateNode, namespaces: readonly string[] | undefined): boolean {
+  if (namespaces === undefined || namespaces.length === 0 || n.namespace === '' || n.role === undefined) return true;
+  return namespaces.includes(n.namespace);
+}
+
+/** The namespaces that hold Flux objects, for the tree's namespace selector. */
+export function fluxNamespaces(estate: Estate): string[] {
+  const out = new Set<string>();
+  for (const n of estate.nodes.values()) {
+    if (n.role !== undefined && n.role !== 'fluxreport' && n.namespace !== '') out.add(n.namespace);
+  }
+  return [...out].sort((a, b) => a.localeCompare(b));
 }
 
 /** Every object under a node (recursive), cycle-safe. */
@@ -77,7 +138,7 @@ export interface TreeCard {
   key: string;
   /** The estate node, or undefined for a group card ("8 ServiceMonitors"). */
   nodeId?: string;
-  group?: { kind: string; ids: string[] };
+  group?: TreeGroup;
   depth: number;
   row: number;
   parentKey?: string;
@@ -89,6 +150,51 @@ export interface TreeCard {
   drillable: boolean;
   /** Worst state below, shown on collapsed cards. */
   worst?: FluxState;
+}
+
+/** A group card: same-kind sub-branches ("15 Kustomizations"), or a parent's leaves ("12 resources"). */
+export interface TreeGroup {
+  /** The kind of a same-kind group; undefined for the leaves box, which mixes kinds. */
+  kind?: string;
+  ids: string[];
+  /** How many of each kind, most first. */
+  kinds: Array<{ kind: string; count: number }>;
+  summary: GroupSummary;
+}
+
+export interface GroupSummary {
+  ready: number;
+  failing: number;
+  suspended: number;
+  /** Reconciling, unknown: neither ready nor a problem. */
+  other: number;
+  /** The worst state in the group, counting what is under each member. */
+  worst: FluxState;
+}
+
+/** Ready, failing (failed, waiting, out of sync) and suspended (or reconcile disabled) members of a group. */
+export function groupSummary(estate: Estate, worst: Map<string, FluxState>, ids: string[]): GroupSummary {
+  const out: GroupSummary = { ready: 0, failing: 0, suspended: 0, other: 0, worst: 'ready' };
+  for (const id of ids) {
+    const s = worst.get(id) ?? estate.nodes.get(id)?.state ?? 'unknown';
+    if (isProblem(s)) out.failing++;
+    else if (s === 'suspended' || s === 'disabled') out.suspended++;
+    else if (s === 'ready' || s === 'drift') out.ready++;
+    else out.other++;
+    if (isProblem(s) && STATE_SEVERITY[s] > (isProblem(out.worst) ? STATE_SEVERITY[out.worst] : -1)) out.worst = s;
+  }
+  return out;
+}
+
+function kindCounts(estate: Estate, ids: string[]): Array<{ kind: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const id of ids) {
+    const kind = estate.nodes.get(id)?.kind ?? '?';
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([kind, count]) => ({ kind, count }))
+    .sort((a, b) => b.count - a.count || kindRank(a.kind) - kindRank(b.kind));
 }
 
 export interface TreeLayout {
@@ -147,7 +253,11 @@ export function treeStart(estate: Estate, children: Map<string, string[]> = chil
   if (estate.root === undefined) return start;
   start.add(estate.root);
   if (estate.nodes.get(estate.root)?.role === 'fluxinstance') {
-    for (const c of children.get(estate.root) ?? []) if (estate.nodes.get(c)?.role === 'kustomization') start.add(c);
+    // Only the Kustomization(s) the FluxInstance applied: an object attached to it for lack of a parent is not one.
+    for (const c of children.get(estate.root) ?? []) {
+      const n = estate.nodes.get(c);
+      if (n?.role === 'kustomization' && n.managedBy === estate.root) start.add(c);
+    }
   }
   return start;
 }
@@ -166,16 +276,30 @@ export function sourceConsumers(estate: Estate): Map<string, string[]> {
 
 /**
  * The top level of the tree: Flux objects (not the FluxReport) that no other Flux object manages, or that
- * only the start (see `treeStart`) manages.
+ * only the start (see `treeStart`) manages. With a namespace selection, an object whose parent is outside it
+ * moves up to the top level, so the selection never hides what is in it.
  */
-export function topLevel(estate: Estate, children: Map<string, string[]> = childIndex(estate)): string[] {
+export function topLevel(
+  estate: Estate,
+  children: Map<string, string[]> = childIndex(estate),
+  namespaces?: readonly string[],
+): string[] {
   const start = treeStart(estate, children);
   const parents = parentIndex(children);
   const out: string[] = [];
   for (const n of estate.nodes.values()) {
-    if (n.role === undefined || n.role === 'fluxreport' || start.has(n.id)) continue;
+    if (n.role === undefined || n.role === 'fluxreport' || start.has(n.id) || !inNamespaces(n, namespaces)) continue;
     const p = parents.get(n.id);
-    if (p === undefined || start.has(p)) out.push(n.id);
+    const parent = p === undefined ? undefined : estate.nodes.get(p);
+    if (parent === undefined || start.has(parent.id) || !inNamespaces(parent, namespaces)) out.push(n.id);
+  }
+  // Never drop a Flux object: one no top-level card leads to (under an object with no page of its own) is a card itself.
+  const reached = new Set<string>([...start, ...out]);
+  for (const id of [...start, ...out]) for (const d of descendants(children, id)) reached.add(d);
+  for (const n of estate.nodes.values()) {
+    if (n.role === undefined || n.role === 'fluxreport' || reached.has(n.id) || !inNamespaces(n, namespaces)) continue;
+    out.push(n.id);
+    for (const d of descendants(children, n.id)) reached.add(d);
   }
   return out.sort((a, b) => compareNodes(estate.nodes.get(a), estate.nodes.get(b)));
 }
@@ -255,7 +379,7 @@ export function layoutTree(
       const n = estate.nodes.get(c);
       if (n === undefined || seen.has(c)) continue;
       if (!filters.showHelmReleases && n.role === 'helmrelease') out.push(...lift(children.get(c) ?? []));
-      else if (visible(n, filters) && keep(c)) out.push(c);
+      else if (visible(n, filters) && keep(c) && (c === focus || inNamespaces(n, filters.namespaces))) out.push(c);
     }
     return out;
   };
@@ -263,7 +387,7 @@ export function layoutTree(
 
   if (focusNode === undefined) {
     // The top level: one card per top-level object, each drilling into a page of its own.
-    for (const id of [...new Set(lift(topLevel(estate, children)))].sort(byStage)) {
+    for (const id of [...new Set(lift(topLevel(estate, children, filters.namespaces)))].sort(byStage)) {
       cards.push({
         key: id,
         nodeId: id,
@@ -306,54 +430,63 @@ export function layoutTree(
       card.row = rows++;
       return card;
     }
-    // Group plain kinds with more objects than the threshold ("8 ServiceMonitors").
-    const byKind = new Map<string, string[]>();
+    // Children with children of their own are sub-branches, kept together by kind when there are more of
+    // a kind than the threshold ("15 Kustomizations"). Leaves go into one box ("12 resources"), except
+    // problems, which stay out of it as cards of their own so a closed box never hides one.
+    const branches: string[] = [];
+    const leaves: string[] = [];
+    const loose: string[] = [];
     for (const c of kids) {
-      const k = estate.nodes.get(c) as EstateNode;
-      const list = byKind.get(k.kind) ?? [];
-      list.push(c);
-      byKind.set(k.kind, list);
+      if (visibleChildren(c).length > 0 || drillable(c)) branches.push(c);
+      else if (isProblem(worst.get(c) ?? 'unknown')) loose.push(c);
+      else leaves.push(c);
+    }
+    const byKind = new Map<string, string[]>();
+    for (const c of branches) {
+      const kind = (estate.nodes.get(c) as EstateNode).kind;
+      byKind.set(kind, [...(byKind.get(kind) ?? []), c]);
     }
     const placed: TreeCard[] = [];
-    for (const c of kids) {
-      const k = estate.nodes.get(c) as EstateNode;
-      const sameKind = byKind.get(k.kind) ?? [];
-      const groupable = k.role === undefined && sameKind.length > filters.groupThreshold;
-      if (!groupable) {
-        if (!seen.has(c)) placed.push(place(c, depth + 1, card.key));
-        continue;
-      }
-      if (sameKind[0] !== c) continue;
-      const gKey = `${id}#${k.kind}`;
-      const groupWorst = sameKind.reduce<FluxState>((w, x) => {
-        const s = worst.get(x) ?? 'ready';
-        return isProblem(s) && STATE_SEVERITY[s] > (isProblem(w) ? STATE_SEVERITY[w] : -1) ? s : w;
-      }, 'ready');
-      const gOpen = expanded.get(gKey) ?? isProblem(groupWorst);
+    const placeGroup = (gKey: string, ids: string[], kind: string | undefined, openByDefault: boolean): void => {
+      const summary = groupSummary(estate, worst, ids);
+      const gOpen = expanded.get(gKey) ?? (openByDefault || summary.failing > 0);
       const gCard: TreeCard = {
         key: gKey,
-        group: { kind: k.kind, ids: sameKind },
+        group: { kind, ids, kinds: kindCounts(estate, ids), summary },
         depth: depth + 1,
         row: 0,
         parentKey: card.key,
-        hidden: gOpen ? 0 : sameKind.length,
+        hidden: gOpen ? 0 : ids.length,
         expanded: gOpen,
         expandable: true,
         drillable: false,
-        worst: groupWorst,
+        worst: summary.worst,
       };
       cards.push(gCard);
       edges.push({ from: card.key, to: gKey });
       maxDepth = Math.max(maxDepth, depth + 1);
       if (gOpen) {
-        const sub = sameKind.filter((x) => !seen.has(x)).map((x) => place(x, depth + 2, gKey));
+        const sub = ids.filter((x) => !seen.has(x)).map((x) => place(x, depth + 2, gKey));
         gCard.row = sub.length > 0 ? centre(sub) : rows++;
       } else {
-        sameKind.forEach((x) => seen.add(x));
+        ids.forEach((x) => seen.add(x));
         gCard.row = rows++;
       }
       placed.push(gCard);
+    };
+    for (const c of branches) {
+      const kind = (estate.nodes.get(c) as EstateNode).kind;
+      const sameKind = byKind.get(kind) ?? [];
+      if (sameKind.length <= filters.groupThreshold) {
+        if (!seen.has(c)) placed.push(place(c, depth + 1, card.key));
+      } else if (sameKind[0] === c) {
+        // The page's own sub-branches open: they are what the page is about.
+        placeGroup(`${id}#${kind}`, sameKind, kind, depth === 0);
+      }
     }
+    for (const c of loose) if (!seen.has(c)) placed.push(place(c, depth + 1, card.key));
+    if (leaves.length > filters.groupThreshold) placeGroup(`${id}#leaves`, leaves, undefined, false);
+    else for (const c of leaves) if (!seen.has(c)) placed.push(place(c, depth + 1, card.key));
     card.row = placed.length > 0 ? centre(placed) : rows++;
     return card;
   };

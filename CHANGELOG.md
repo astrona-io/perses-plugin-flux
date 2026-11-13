@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Tree namespace selector: "All namespaces" by default, or any of the namespaces that hold Flux objects. It filters
+  client-side, is kept with the panel's state and cleared by Reset. Plain objects under a shown Flux object always
+  show.
+- Tree pan and zoom on the top level and every page: drag the canvas to pan, wheel or pinch to zoom on the cursor,
+  toolbar buttons (zoom out, 100%, zoom in, Fit to view), double-click empty canvas to fit, and the keys `+`, `−` and
+  `0`. A drag is never taken as a click. Transform-based; no new dependency.
+
+### Changed
+
+- Tree grouping: under one parent, objects with nothing below them collect in one expandable box ("12 resources")
+  with kind chips and state counts; objects with their own children are grouped by kind ("15 Kustomizations") with
+  a ready, failing and suspended count, open by default, and kept together as branches. Failing leaves stay outside
+  the box; a group with a failing member opens and turns red. In delete mode a group shows the worst impact among
+  its members. `groupThreshold` now applies to both.
+
+### Fixed
+
+- The Tree dropped Flux objects that manage themselves through a loop, for example a ResourceSet applied by a
+  Kustomization it generates: every member had a parent, so none was at the top level and everything under the loop
+  was unreachable. The loop is now cut above one entry (FluxInstance, then ResourceSet, Kustomization,
+  HelmRelease), which shows at the top level.
+- Flux objects whose parent could not be found and that were attached to a FluxInstance root were hidden as part of
+  the root's start set. They now show at the top level, and a last check lists any Flux object not reachable from
+  the top level.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

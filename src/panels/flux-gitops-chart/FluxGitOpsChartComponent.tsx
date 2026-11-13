@@ -92,10 +92,17 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
   // The tree page: undefined is the top level, else the object drilled into.
   const [treeFocus, setTreeFocus] = useState<string>();
   const [treeDirection, setTreeDirection] = useState<TreeDirection>(options.treeDirection);
+  // The Tree's namespace selection; empty is all namespaces.
+  const [treeNamespaces, setTreeNamespaces] = useState<string[]>([]);
 
   const viewFilters: ViewFilters = useMemo(
-    () => ({ ...filters, showPods: options.showPods, groupThreshold: options.groupThreshold }),
-    [filters, options.showPods, options.groupThreshold],
+    () => ({
+      ...filters,
+      showPods: options.showPods,
+      groupThreshold: options.groupThreshold,
+      namespaces: view === 'tree' ? treeNamespaces : undefined,
+    }),
+    [filters, options.showPods, options.groupThreshold, view, treeNamespaces],
   );
   const children = useMemo(() => (estate === undefined ? undefined : childIndex(estate)), [estate]);
   const tree = useMemo(
@@ -290,6 +297,8 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
               onToggle={onToggle}
               onFocus={setTreeFocus}
               onDirection={setTreeDirection}
+              namespaces={treeNamespaces}
+              onNamespaces={setTreeNamespaces}
             />
           )
         );
@@ -366,6 +375,7 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
             setInventoryId(undefined);
             setTreeFocus(undefined);
             setTreeDirection(options.treeDirection);
+            setTreeNamespaces([]);
             setFilters({
               showSources: options.showSources,
               showHelmReleases: options.showHelmReleases,
