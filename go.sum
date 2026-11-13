@@ -10,6 +10,7 @@ github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRW
 github.com/perses/common v0.31.2/go.mod h1:KgLB0ojBFzg93UwTNK8uAE1yuGexBiwqHiAvTFcHRDI=
 github.com/perses/perses v0.55.0-rc.0/go.mod h1:pzMcH+ZAWMl9Va4XAnVoMCbnoHTn7lH2bdoTZtULQ9w=
 github.com/perses/spec v0.3.0-rc.1/go.mod h1:bbTvfdCprae8P4JHknL2VnIkLkTLXqV4stpOlZyxibo=
+github.com/perses/spec v0.3.0/go.mod h1:bbTvfdCprae8P4JHknL2VnIkLkTLXqV4stpOlZyxibo=
 github.com/prometheus/client_golang v1.24.1/go.mod h1:F+oSRECHg4sse5ucfYpYDeIv/hu68Zo0uoHKetWnzcE=
 github.com/prometheus/client_model v0.6.3/go.mod h1:gpN5P9S7Rr6Yr92PiQ+Ixvhf6JZEkF1dnxsYL2aPBEM=
 github.com/prometheus/common v0.72.0/go.mod h1:77NWqAQ2tXT7BIK40qjJdw5Acrsrg1TlHAnsQi3i6mk=
