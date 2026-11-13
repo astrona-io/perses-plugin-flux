@@ -10,6 +10,7 @@ github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8m
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/perses/common v0.31.2/go.mod h1:KgLB0ojBFzg93UwTNK8uAE1yuGexBiwqHiAvTFcHRDI=
 github.com/perses/perses v0.55.0-rc.0/go.mod h1:pzMcH+ZAWMl9Va4XAnVoMCbnoHTn7lH2bdoTZtULQ9w=
+github.com/perses/perses v0.55.1 h1:FuXS5KB1gT4OGx/GJS7u/UVhZ1aGqVlDRSjIzEaYXcY=
 github.com/perses/perses v0.55.1/go.mod h1:/8Ow2NFrG3ViGK0KgTau6L9a1WVLpB293oQ5x5Bhe50=
 github.com/perses/spec v0.3.0-rc.1/go.mod h1:bbTvfdCprae8P4JHknL2VnIkLkTLXqV4stpOlZyxibo=
 github.com/perses/spec v0.3.0/go.mod h1:bbTvfdCprae8P4JHknL2VnIkLkTLXqV4stpOlZyxibo=
