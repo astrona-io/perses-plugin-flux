@@ -9,10 +9,9 @@
 #   - verbs get and list only: never watch, create, update, patch or delete;
 #   - no secrets, configmaps or serviceaccounts (objects of those kinds in an inventory show as
 #     "not read", see docs/DECISIONS.md);
-#   - no subresources (status, log, exec), except one: get on the services/proxy of the Service named
-#     source-controller, so the panel can read the Helm repository indexes source-controller already
-#     serves (chart updates in the List view and drawer). Leave that rule out to turn the check off;
-#     the cells then say "no access" instead of guessing.
+#   - no subresources (status, log, exec, proxy). Chart updates would need get on source-controller's
+#     services/proxy, but the Kubernetes datasource v0.1.0 refuses proxy paths, so it is not granted
+#     and the chart update cells say "no access" (see README, Chart updates).
 #
 # The Flux Operator rule is harmless when the operator is not installed. Change `perses` / `perses`
 # (service account / namespace) to where Perses runs.
@@ -47,13 +46,6 @@ rules:
   - apiGroups: [apps]
     resources: [deployments, statefulsets, daemonsets, replicasets]
     verbs: [get, list]
-  # Chart updates: GET through the API server's service proxy to source-controller only, which serves
-  # the HelmRepository indexes (artifacts) it has already fetched. Both names: the API server
-  # authorizes a proxy request against the Service name; some versions pass it with the port.
-  - apiGroups: ['']
-    resources: [services/proxy]
-    resourceNames: [source-controller, 'source-controller:80']
-    verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

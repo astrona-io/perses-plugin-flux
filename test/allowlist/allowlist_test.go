@@ -124,6 +124,7 @@ func TestDeniedPaths(t *testing.T) {
 		"/api/v1/namespaces/flux-system/pods/source-controller-1/log",
 		"/api/v1/namespaces/flux-system/pods/source-controller-1/exec",
 		"/api/v1/namespaces/flux-system/services/notification-controller:80/proxy/",
+		"/api/v1/namespaces/flux-system/services/source-controller:80/proxy/helmrepository/team-a1/podinfo/index-0f1e2d3c4b5a.yaml",
 		"/api/v1/nodes/node-1/proxy/metrics",
 		"/apis/kustomize.toolkit.fluxcd.io/v1/namespaces/flux-system/kustomizations/apps",
 		"/apis/kustomize.toolkit.fluxcd.io/v1/namespaces/flux-system/kustomizations/apps/status",

@@ -18,8 +18,8 @@ there.
   and CRD cascades into other teams' objects, lost volumes, and what fails afterwards.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/tree-dark.jpg">
-  <img alt="Tree view: the root Kustomization, its stages, a failed HelmRelease and what it installed" src="docs/images/tree-light.jpg">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/tree-page-dark.jpg">
+  <img alt="Tree page of the failed monitoring Kustomization: its HelmRelease, the chart and what it installed, down to the failing pod" src="docs/images/tree-page-light.jpg">
 </picture>
 
 ## Supported versions
@@ -52,8 +52,9 @@ Six views, a header and a drawer:
 - **Inventory**: everything the selected Kustomization or HelmRelease manages, grouped by kind.
 - **List**: every Flux object in a sortable table, problems first. Each HelmRelease has a "Chart update" cell:
   `1.2.3 → 1.4.0 (in range)` when Flux picks the newer chart up on its next reconcile, `(needs a bump)` when it is
-  outside `spec.chart.spec.version`, `✓ newest`, or "not checked" with the reason in a tooltip (see
-  [Chart updates](#chart-updates)).
+  outside `spec.chart.spec.version`, `✓ newest`, or "not checked" with the reason in a tooltip. It needs a
+  Kubernetes datasource that does not exist yet; with perses-plugin-kubernetes v0.1.0 the cell shows "✕ no access"
+  (see [Chart updates](#chart-updates)).
 - **Flux resources**: the Flux installation, its controllers and how many objects of each Flux kind are in which
   state. See [Flux resources](#flux-resources).
 - **Drawer**: conditions with reason and message, revisions with commit links, Helm history, the chart update,
@@ -68,6 +69,8 @@ under `prefers-reduced-motion`.
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/stages-dark.jpg"><img alt="Stages view" src="docs/images/stages-light.jpg"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/sources-dark.jpg"><img alt="Sources view" src="docs/images/sources-light.jpg"></picture> |
 | **Inventory** | **List** |
 | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/inventory-dark.jpg"><img alt="Inventory view" src="docs/images/inventory-light.jpg"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/list-dark.jpg"><img alt="List view" src="docs/images/list-light.jpg"></picture> |
+| **Tree, top level** | **Flux resources** |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/tree-dark.jpg"><img alt="Tree view, top level: the root's sources and Kustomizations" src="docs/images/tree-light.jpg"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flux-resources-dark.jpg"><img alt="Flux resources view: the FluxInstance, Flux version, sync source, operator and cluster" src="docs/images/flux-resources-light.jpg"></picture> |
 
 ### Delete impact
 
@@ -123,12 +126,9 @@ operator and can lag a few minutes. Field sources are in [docs/DECISIONS.md](doc
 - It never reads Secrets, ConfigMaps or ServiceAccounts: the datasource cannot do metadata-only reads, so reading
   them would pull Secret data through the proxy. Inventory entries of those kinds are drawn from the inventory,
   dashed, "not read".
-- No writes, no watch, no subresources (`status`, `log`, `exec`), with one exception: `GET` on source-controller's
-  Service proxy, for chart updates. Through it the panel only reads Helm repository indexes
-  (`/helmrepository/<namespace>/<name>/index-<digest>.yaml`) that source-controller already fetched and serves to
-  the other Flux controllers. The RBAC rule names only the `source-controller` Service, and the allow-list pattern
-  only that path shape, so no other Service and no other source-controller path (charts, Git or OCI artifacts) is
-  reachable. Leave both out to turn the check off.
+- No writes, no watch, no subresources (`status`, `log`, `exec`, `proxy`). [Chart updates](#chart-updates) would
+  need one: `GET` on source-controller's Service proxy for Helm repository indexes. The Kubernetes datasource
+  (v0.1.0) refuses every allow-list pattern that contains `proxy`, so the setup below does not grant it.
 
 ## Setup
 
@@ -164,11 +164,6 @@ rules:
   - apiGroups: [apps]
     resources: [deployments, statefulsets, daemonsets, replicasets]
     verbs: [get, list]
-  # Chart updates: read the Helm repository indexes source-controller serves (optional)
-  - apiGroups: ['']
-    resources: [services/proxy]
-    resourceNames: [source-controller, 'source-controller:80']
-    verbs: [get]
 ```
 
 A missing permission shows a warning naming the refused lists, not an empty panel.
@@ -189,13 +184,11 @@ refuse.
   { "method": "GET", "endpointPattern": "^/apis/source\\.toolkit\\.fluxcd\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(gitrepositories|ocirepositories|helmrepositories|helmcharts|buckets)$" },
   { "method": "GET", "endpointPattern": "^/apis/kustomize\\.toolkit\\.fluxcd\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?kustomizations$" },
   { "method": "GET", "endpointPattern": "^/apis/helm\\.toolkit\\.fluxcd\\.io/v2/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?helmreleases$" },
-  { "method": "GET", "endpointPattern": "^/apis/fluxcd\\.controlplane\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(fluxinstances|fluxreports|resourcesets|resourcesetinputproviders)$" },
-  { "method": "GET", "endpointPattern": "^/api/v1/namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/services/source-controller:80/proxy/helmrepository/[a-z0-9]([-a-z0-9]*[a-z0-9])?/[a-z0-9]([-a-z0-9.]*[a-z0-9])?/index-[a-f0-9]+\\.yaml$" }
+  { "method": "GET", "endpointPattern": "^/apis/fluxcd\\.controlplane\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(fluxinstances|fluxreports|resourcesets|resourcesetinputproviders)$" }
 ]
 ```
 
-The namespaced forms are used when the panel's `namespaces` option is set. The last pattern is for
-[chart updates](#chart-updates) and is optional.
+The namespaced forms are used when the panel's `namespaces` option is set.
 
 ### Chart updates
 
@@ -204,7 +197,12 @@ version (`status.history[0].chartVersion`) with the versions in the repository i
 repository itself: it reads the index source-controller already downloaded, from the HelmRepository's
 `status.artifact.url`, through the API server's service proxy
 (`/api/v1/namespaces/<flux-ns>/services/source-controller:80/proxy/helmrepository/<ns>/<name>/index-<digest>.yaml`).
-That needs the `services/proxy` rule and the last allow-list pattern above.
+
+**Not available yet.** The [Kubernetes datasource](https://github.com/astrona-io/perses-plugin-kubernetes) v0.1.0
+refuses any `allowedEndpoints` pattern that contains `proxy`: adding the index pattern makes Perses reject the whole
+datasource. Until a datasource release can admit that one exact path, every HelmRelease's cell and drawer row shows
+"✕ no access". Set `checkChartUpdates: false` to hide them. Do not add a `services/proxy` RBAC rule for this panel.
+What follows describes how the check works once the datasource allows it.
 
 - Prereleases count only when the installed version is one.
 - "in range": the newest version matches `spec.chart.spec.version` (or the HelmChart's `spec.version`), so Flux
@@ -273,7 +271,7 @@ Every option is optional.
 | `fluxWebUIUrl` | none | e.g. `https://flux.example.com/resource/${kind}/${namespace}/${name}` |
 | `gitCommitUrl` | none | e.g. `https://${repo}/commit/${revision}` |
 | `enableDeleteImpact` | `true` | shows the "What if I delete...?" toggle |
-| `checkChartUpdates` | `true` | reads Helm repository indexes for the "Chart update" column and drawer row |
+| `checkChartUpdates` | `true` | reads Helm repository indexes for the "Chart update" column and drawer row; shows "✕ no access" until the Kubernetes datasource allows the index path ([Chart updates](#chart-updates)) |
 
 ```json
 {
