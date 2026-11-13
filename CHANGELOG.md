@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-13
+
 ### Added
 
 - Tree namespace selector: "All namespaces" by default, or any of the namespaces that hold Flux objects. It filters
@@ -76,6 +78,7 @@ All notable changes to this project are documented here. The format follows
 - `deploy/`: read-only RBAC, the datasource allow-list, and an extended kube-state-metrics config.
 - A `dev/` stack with two profiles (plain Flux, Flux Operator) and a staged fleet with every state.
 
-[Unreleased]: https://github.com/astrona-io/perses-plugin-flux/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/astrona-io/perses-plugin-flux/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.3.0
 [0.2.0]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.2.0
 [0.1.0]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.1.0
