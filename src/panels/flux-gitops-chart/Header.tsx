@@ -139,6 +139,7 @@ const VIEW_LABEL: Record<FluxView, string> = {
   sources: 'Sources',
   inventory: 'Inventory',
   list: 'List',
+  flux: 'Flux resources',
 };
 
 export function Toolbar(p: ToolbarProps): ReactElement {
