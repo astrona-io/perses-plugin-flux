@@ -8,9 +8,11 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import type { IndexReader } from '../../model/chart-index';
+import { proxyIndexReader } from '../../model/chart-index';
 import type { Estate } from '../../model/estate';
 import { buildEstate } from '../../model/estate';
-import type { FetchResult, KubernetesListClient, ReadProblem } from '../../model/fetch';
+import type { FetchResult, KubernetesListClient, ReadFailure, ReadProblem } from '../../model/fetch';
 import { describeFailures, fetchEstate } from '../../model/fetch';
 import type { History, PrometheusRangeClient } from '../../model/history';
 import { fetchHistory, parseDuration } from '../../model/history';
@@ -22,6 +24,8 @@ export const PROMETHEUS_DATASOURCE_KIND = 'PrometheusDatasource';
 export interface FluxData {
   estate?: Estate;
   problems: ReadProblem[];
+  /** Every list that failed, for views that must show an error instead of a count. */
+  failures?: ReadFailure[];
   requests: number;
   isLoading: boolean;
   /** A fatal error: no datasource, or every request failed. */
@@ -31,6 +35,8 @@ export interface FluxData {
   historyLoading: boolean;
   cluster: string;
   range: { start: number; end: number };
+  /** Reads Helm repository indexes through the Kubernetes datasource (option checkChartUpdates). */
+  chartIndex?: IndexReader;
 }
 
 /** Splits `a, b` and `{a,b}` (a variable in csv or default format) into namespaces. */
@@ -92,6 +98,12 @@ export function useFluxData(o: ResolvedOptions): FluxData {
     queryFn: async () => fetchHistory(pClient.data as PrometheusRangeClient, range, cluster),
   });
 
+  const datasourceUrl = kClient.data?.options?.datasourceUrl;
+  const chartIndex = useMemo(
+    () => (o.checkChartUpdates && datasourceUrl ? proxyIndexReader(datasourceUrl) : undefined),
+    [o.checkChartUpdates, datasourceUrl],
+  );
+
   const fatal =
     kClient.error instanceof Error
       ? new Error(`Kubernetes datasource: ${kClient.error.message}`)
@@ -100,6 +112,7 @@ export function useFluxData(o: ResolvedOptions): FluxData {
   return {
     estate,
     problems,
+    failures: live.data?.failures,
     requests: live.data?.requests ?? 0,
     isLoading: kClient.isLoading || (live.isLoading && live.fetchStatus !== 'idle'),
     error: fatal ?? undefined,
@@ -108,5 +121,6 @@ export function useFluxData(o: ResolvedOptions): FluxData {
     historyLoading: history.isLoading && history.fetchStatus !== 'idle',
     cluster,
     range,
+    chartIndex,
   };
 }

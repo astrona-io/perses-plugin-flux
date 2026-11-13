@@ -21,11 +21,13 @@ import {
 import { DeleteReport, Details } from './Drawer';
 import type { FluxGitOpsChartProps, FluxView, ResolvedOptions, TreeDirection } from './flux-gitops-chart-types';
 import { withDefaults } from './flux-gitops-chart-types';
+import { FluxResourcesTab } from './FluxResourcesView';
 import { KpiTiles, Legend, Toolbar } from './Header';
 import { HistoryStrip } from './HistoryStrip';
 import type { Overlay } from './NodeCard';
 import { InventoryView, ListView, SourcesView, StagesView } from './OtherViews';
 import { TreeView } from './TreeView';
+import { useChartUpdates } from './useChartUpdates';
 import type { FluxData } from './useFluxData';
 import { useFluxData } from './useFluxData';
 
@@ -136,6 +138,13 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
     [estate, deleteTarget, options.enableDeleteImpact],
   );
   const overlays = useMemo(() => (estate === undefined ? undefined : overlaysFor(estate, impact)), [estate, impact]);
+  // Read lazily: every HelmRelease for the List view, else only the one open in the drawer.
+  const chartUpdates = useChartUpdates(
+    estate,
+    data.chartIndex,
+    options.checkChartUpdates,
+    view === 'list' ? 'all' : selected,
+  );
 
   const onSelect = useCallback(
     (id: string) => {
@@ -244,8 +253,27 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
       case 'list':
         return (
           list && (
-            <ListView estate={estate} rows={list} selected={selected} onSelect={onSelect} now={data.range.end * 1000} />
+            <ListView
+              estate={estate}
+              rows={list}
+              selected={selected}
+              onSelect={onSelect}
+              now={data.range.end * 1000}
+              chartUpdates={chartUpdates}
+            />
           )
+        );
+      case 'flux':
+        return (
+          <FluxResourcesTab
+            estate={estate}
+            failures={data.failures}
+            options={options}
+            range={data.range}
+            cluster={data.cluster}
+            selected={selected}
+            onSelect={onSelect}
+          />
         );
       default:
         return (
@@ -291,6 +319,7 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
             fluxWebUIUrl={options.fluxWebUIUrl}
             gitCommitUrl={options.gitCommitUrl}
             deleteEnabled={options.enableDeleteImpact}
+            chartUpdate={chartUpdates?.get(node.id)}
             onSelect={onSelect}
             onInventory={(id) => {
               setInventoryId(id);

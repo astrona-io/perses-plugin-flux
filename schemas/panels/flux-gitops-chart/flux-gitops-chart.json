@@ -15,6 +15,7 @@
     "showHistory": true,
     "fluxWebUIUrl": "https://flux.example.com/resource/${kind}/${namespace}/${name}",
     "gitCommitUrl": "https://${repo}/commit/${revision}",
-    "enableDeleteImpact": true
+    "enableDeleteImpact": true,
+    "checkChartUpdates": true
   }
 }

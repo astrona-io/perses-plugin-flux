@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Flux resources view** (`defaultView: flux`): the Flux installation, its controllers and per-kind counts by
+  state. With the Flux Operator it reads the FluxInstance and the FluxReport (`components`, `reconcilers`, `sync`);
+  without it, the controller Deployments and the panel's own counts. It names its source, shows a failed read as an
+  error instead of zero, and adds reconciles per minute and mean duration per kind from
+  `gotk_reconcile_duration_seconds` when Prometheus is set.
+- Chart updates for HelmReleases: a "Chart update" column in the List view and a row in the drawer
+  (`1.2.3 → 1.4.0`, in range or needs a bump). Read from the Helm repository index source-controller already
+  serves, through the API server's service proxy, lazily and once per index digest. New option
+  `checkChartUpdates` (default `true`); `deploy/rbac.yaml` gains `get` on `services/proxy` for
+  `source-controller` only, and `deploy/kubernetes-datasource.json` a GET pattern limited to its index paths.
+  Adds the `yaml` and `semver` dependencies.
 - Tree pages: the tree tab opens on the top-level Flux objects (those no other Flux object manages); clicking a card
   with children opens its page, and a breadcrumb ("All resources › flux-system/apps › …") leads back. A "Flux root"
   link keeps the root's drawer reachable.

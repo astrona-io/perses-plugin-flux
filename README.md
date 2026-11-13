@@ -34,7 +34,7 @@ there.
 
 ## What it shows
 
-Five views, a header and a drawer:
+Six views, a header and a drawer:
 
 - **KPI tiles**: controllers ready, sources, Kustomizations, Helm releases, suspended, and the sync status (from
   the FluxReport when the Flux Operator is installed).
@@ -50,9 +50,14 @@ Five views, a header and a drawer:
 - **Sources**: every source with what it feeds and delivers, and source chains ("defined in infra-controllers").
   Double-click a source, or use "Show in tree ›", to see it in the tree with everything that uses it.
 - **Inventory**: everything the selected Kustomization or HelmRelease manages, grouped by kind.
-- **List**: every Flux object in a sortable table, problems first.
-- **Drawer**: conditions with reason and message, revisions with commit links, Helm history, recent events, what
-  the object blocks, and links to the Flux Operator web UI.
+- **List**: every Flux object in a sortable table, problems first. Each HelmRelease has a "Chart update" cell:
+  `1.2.3 → 1.4.0 (in range)` when Flux picks the newer chart up on its next reconcile, `(needs a bump)` when it is
+  outside `spec.chart.spec.version`, `✓ newest`, or "not checked" with the reason in a tooltip (see
+  [Chart updates](#chart-updates)).
+- **Flux resources**: the Flux installation, its controllers and how many objects of each Flux kind are in which
+  state. See [Flux resources](#flux-resources).
+- **Drawer**: conditions with reason and message, revisions with commit links, Helm history, the chart update,
+  recent events, what the object blocks, and links to the Flux Operator web UI.
 
 States: Ready ✓, Reconciling, Out of sync ↻, Waiting ◔, Failed ✕, Drift corrected ≠, Suspended ⏸, Reconcile
 disabled (dashed), protected 🛡. Every state has a label and an icon, never colour alone, and animations stop
@@ -96,6 +101,21 @@ The rules, with the Flux docs and code they come from, are in [docs/DECISIONS.md
 The panel detects which is installed: when the `fluxcd.controlplane.io` lists answer, it uses them; when they
 return 404 it carries on with plain Flux.
 
+### Flux resources
+
+The `flux` view shows Flux itself, and always says where its numbers come from:
+
+| | Plain Flux | With the Flux Operator |
+| --- | --- | --- |
+| Installation | none | FluxInstance: Ready, version requested and running, distribution, registry, last applied revision, components, sync source; operator and cluster versions |
+| Controllers | the controller Deployments: ready replicas, image and tag | the FluxReport's `components`: ready, status, image |
+| Objects by kind | counted by the panel from what it read: total, ready, reconciling, waiting, failed, suspended | the FluxReport's `reconcilers`: running, failing, suspended, artifact storage |
+
+With the Prometheus datasource set, each kind also gets reconciles per minute and the mean reconcile duration over
+the dashboard range (`gotk_reconcile_duration_seconds`). A list the panel could not read shows its error, never zero.
+The panel's own counts cover only the namespaces in the `namespaces` option. The FluxReport is refreshed by the
+operator and can lag a few minutes. Field sources are in [docs/DECISIONS.md](docs/DECISIONS.md#flux-resources-view).
+
 ## Security model
 
 - The panel only issues `GET` list requests through the Kubernetes datasource, which goes through the Perses proxy.
@@ -103,7 +123,12 @@ return 404 it carries on with plain Flux.
 - It never reads Secrets, ConfigMaps or ServiceAccounts: the datasource cannot do metadata-only reads, so reading
   them would pull Secret data through the proxy. Inventory entries of those kinds are drawn from the inventory,
   dashed, "not read".
-- No writes, no watch, no subresources (`status`, `log`, `exec`, `proxy`).
+- No writes, no watch, no subresources (`status`, `log`, `exec`), with one exception: `GET` on source-controller's
+  Service proxy, for chart updates. Through it the panel only reads Helm repository indexes
+  (`/helmrepository/<namespace>/<name>/index-<digest>.yaml`) that source-controller already fetched and serves to
+  the other Flux controllers. The RBAC rule names only the `source-controller` Service, and the allow-list pattern
+  only that path shape, so no other Service and no other source-controller path (charts, Git or OCI artifacts) is
+  reachable. Leave both out to turn the check off.
 
 ## Setup
 
@@ -139,6 +164,11 @@ rules:
   - apiGroups: [apps]
     resources: [deployments, statefulsets, daemonsets, replicasets]
     verbs: [get, list]
+  # Chart updates: read the Helm repository indexes source-controller serves (optional)
+  - apiGroups: ['']
+    resources: [services/proxy]
+    resourceNames: [source-controller, 'source-controller:80']
+    verbs: [get]
 ```
 
 A missing permission shows a warning naming the refused lists, not an empty panel.
@@ -159,11 +189,36 @@ refuse.
   { "method": "GET", "endpointPattern": "^/apis/source\\.toolkit\\.fluxcd\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(gitrepositories|ocirepositories|helmrepositories|helmcharts|buckets)$" },
   { "method": "GET", "endpointPattern": "^/apis/kustomize\\.toolkit\\.fluxcd\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?kustomizations$" },
   { "method": "GET", "endpointPattern": "^/apis/helm\\.toolkit\\.fluxcd\\.io/v2/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?helmreleases$" },
-  { "method": "GET", "endpointPattern": "^/apis/fluxcd\\.controlplane\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(fluxinstances|fluxreports|resourcesets|resourcesetinputproviders)$" }
+  { "method": "GET", "endpointPattern": "^/apis/fluxcd\\.controlplane\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(fluxinstances|fluxreports|resourcesets|resourcesetinputproviders)$" },
+  { "method": "GET", "endpointPattern": "^/api/v1/namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/services/source-controller:80/proxy/helmrepository/[a-z0-9]([-a-z0-9]*[a-z0-9])?/[a-z0-9]([-a-z0-9.]*[a-z0-9])?/index-[a-f0-9]+\\.yaml$" }
 ]
 ```
 
-The namespaced forms are used when the panel's `namespaces` option is set.
+The namespaced forms are used when the panel's `namespaces` option is set. The last pattern is for
+[chart updates](#chart-updates) and is optional.
+
+### Chart updates
+
+For a HelmRelease whose chart comes from a default (HTTP/S) `HelmRepository`, the panel compares the installed
+version (`status.history[0].chartVersion`) with the versions in the repository index. It does not reach the chart
+repository itself: it reads the index source-controller already downloaded, from the HelmRepository's
+`status.artifact.url`, through the API server's service proxy
+(`/api/v1/namespaces/<flux-ns>/services/source-controller:80/proxy/helmrepository/<ns>/<name>/index-<digest>.yaml`).
+That needs the `services/proxy` rule and the last allow-list pattern above.
+
+- Prereleases count only when the installed version is one.
+- "in range": the newest version matches `spec.chart.spec.version` (or the HelmChart's `spec.version`), so Flux
+  installs it on the next reconcile. "needs a bump": it does not, change the range.
+- Not checked, with the reason in a tooltip: OCI `HelmRepository`, `chartRef` to an `OCIRepository` or `HelmChart`,
+  and charts built from a `GitRepository` or `Bucket` (there is no index of versions).
+- A refused or failed read shows "✕ no access" or "✕ not read" with the error, never "newest".
+- An index is read only when the List view or that HelmRelease's drawer is open, once per index digest (the path
+  changes when source-controller fetches a new index), and only for repositories that back a HelmRelease.
+
+Flux's default `allow-egress` NetworkPolicy in `flux-system` only admits traffic from pods in that namespace. If
+the API server cannot reach source-controller because of it, the cell says "not read" with the error; allow
+ingress to source-controller's port 9090 (`http`) from the API server, or turn the check off with
+`checkChartUpdates: false`.
 
 ### Perses proxy: allow the API server's IP
 
@@ -206,7 +261,7 @@ Every option is optional.
 | `cluster` | none | value of the `cluster` label in Prometheus queries |
 | `namespaces` | all | only these namespaces (cluster-scoped objects always show) |
 | `rootKustomization` | `auto` (`flux-system/flux-system`, or the FluxInstance) | `name` or `namespace/name` |
-| `defaultView` | `tree` | `tree`, `stages`, `sources`, `inventory`, `list` |
+| `defaultView` | `tree` | `tree`, `stages`, `sources`, `inventory`, `list`, `flux` |
 | `treeDirection` | `vertical` | `vertical` (top to bottom) or `horizontal` (left to right) |
 | `showSources` | `true` | |
 | `showHelmReleases` | `true` | |
@@ -218,6 +273,7 @@ Every option is optional.
 | `fluxWebUIUrl` | none | e.g. `https://flux.example.com/resource/${kind}/${namespace}/${name}` |
 | `gitCommitUrl` | none | e.g. `https://${repo}/commit/${revision}` |
 | `enableDeleteImpact` | `true` | shows the "What if I delete...?" toggle |
+| `checkChartUpdates` | `true` | reads Helm repository indexes for the "Chart update" column and drawer row |
 
 ```json
 {
