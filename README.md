@@ -38,13 +38,17 @@ Five views, a header and a drawer:
 
 - **KPI tiles**: controllers ready, sources, Kustomizations, Helm releases, suspended, and the sync status (from
   the FluxReport when the Flux Operator is installed).
-- **Tree**: root Kustomization (or FluxInstance) to Kustomizations to HelmReleases and objects to everything Helm
-  installed, down to ReplicaSets and Pods. Problem branches open, healthy ones collapsed; more objects of one kind
-  under one parent than `groupThreshold` are grouped ("8 ServiceMonitors"). Cards keep their size and the tree
-  scrolls.
+- **Tree**: opens on the top-level Flux objects, the ones no other Flux object manages. Click a card with children
+  (marked ›) to open its page: that object and everything under it, from Kustomizations to HelmReleases and objects
+  to everything Helm installed, down to ReplicaSets and Pods. A breadcrumb (`All resources › flux-system/apps ›
+  observability`) leads back, one click per level; the "i" button on a card opens its drawer, and "Flux root" opens
+  the root Kustomization's (or FluxInstance's). Problem branches open, healthy ones collapsed; more objects of one
+  kind under one parent than `groupThreshold` are grouped ("8 ServiceMonitors"). Top to bottom by default, left to
+  right with the toggle or `treeDirection`. Cards keep their size and the tree scrolls.
 - **Stages**: Kustomizations by their `dependsOn` depth, sources on the left. A failed stage marks what comes after
   it as waiting.
 - **Sources**: every source with what it feeds and delivers, and source chains ("defined in infra-controllers").
+  Double-click a source, or use "Show in tree ›", to see it in the tree with everything that uses it.
 - **Inventory**: everything the selected Kustomization or HelmRelease manages, grouped by kind.
 - **List**: every Flux object in a sortable table, problems first.
 - **Drawer**: conditions with reason and message, revisions with commit links, Helm history, recent events, what
@@ -203,6 +207,7 @@ Every option is optional.
 | `namespaces` | all | only these namespaces (cluster-scoped objects always show) |
 | `rootKustomization` | `auto` (`flux-system/flux-system`, or the FluxInstance) | `name` or `namespace/name` |
 | `defaultView` | `tree` | `tree`, `stages`, `sources`, `inventory`, `list` |
+| `treeDirection` | `vertical` | `vertical` (top to bottom) or `horizontal` (left to right) |
 | `showSources` | `true` | |
 | `showHelmReleases` | `true` | |
 | `onlyProblems` | `false` | keep only problems and the path to them |

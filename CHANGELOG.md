@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Tree pages: the tree tab opens on the top-level Flux objects (those no other Flux object manages); clicking a card
+  with children opens its page, and a breadcrumb ("All resources › flux-system/apps › …") leads back. A "Flux root"
+  link keeps the root's drawer reachable.
+- Tree direction: top to bottom (default) or left to right, as a toggle in the tree tab and the panel option
+  `treeDirection: vertical | horizontal`.
+- Sources tab: double-click a source, or use its "Show in tree ›" button, to open its page in the tree with
+  everything that uses it unfolded.
+
+### Changed
+
+- Cards that open a page have an "i" button for the details drawer; clicking the card itself navigates.
+- The tree is top to bottom by default (it was left to right).
+
 ## [0.1.0] - 2026-11-13
 
 ### Added

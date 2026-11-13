@@ -85,6 +85,8 @@ export interface TreeCard {
   hidden: number;
   expanded: boolean;
   expandable: boolean;
+  /** The card has a page of its own: clicking it drills into it (its children, or a source's consumers). */
+  drillable: boolean;
   /** Worst state below, shown on collapsed cards. */
   worst?: FluxState;
 }
@@ -94,6 +96,8 @@ export interface TreeLayout {
   edges: Array<{ from: string; to: string }>;
   rows: number;
   depth: number;
+  /** The object the page is drilled into; undefined on the top level. */
+  focus?: string;
 }
 
 const KIND_ORDER = [
@@ -127,17 +131,95 @@ function visible(n: EstateNode, f: ViewFilters): boolean {
   return true;
 }
 
+/** Child to parent, the inverse of `childIndex` (first parent wins). */
+export function parentIndex(children: Map<string, string[]>): Map<string, string> {
+  const parents = new Map<string, string>();
+  for (const [p, kids] of children) for (const c of kids) if (!parents.has(c)) parents.set(c, p);
+  return parents;
+}
+
 /**
- * Lays the tree out left to right: one column per depth, one row per visible leaf, parents centred
- * on their children. `expanded` overrides the default (problems open, healthy branches closed).
+ * Where Flux starts: the root (root Kustomization or FluxInstance) and, under a FluxInstance, the sync
+ * Kustomization it generates. The tree never shows these as its entry; it starts one level below.
+ */
+export function treeStart(estate: Estate, children: Map<string, string[]> = childIndex(estate)): Set<string> {
+  const start = new Set<string>();
+  if (estate.root === undefined) return start;
+  start.add(estate.root);
+  if (estate.nodes.get(estate.root)?.role === 'fluxinstance') {
+    for (const c of children.get(estate.root) ?? []) if (estate.nodes.get(c)?.role === 'kustomization') start.add(c);
+  }
+  return start;
+}
+
+/** Live Flux objects whose `sourceRef` is this source: what a source's page shows below it. */
+export function sourceConsumers(estate: Estate): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const n of estate.nodes.values()) {
+    if (n.sourceRef === undefined || !n.live || n.sourceRef === n.id || !estate.nodes.has(n.sourceRef)) continue;
+    const list = out.get(n.sourceRef);
+    if (list === undefined) out.set(n.sourceRef, [n.id]);
+    else list.push(n.id);
+  }
+  return out;
+}
+
+/**
+ * The top level of the tree: Flux objects (not the FluxReport) that no other Flux object manages, or that
+ * only the start (see `treeStart`) manages.
+ */
+export function topLevel(estate: Estate, children: Map<string, string[]> = childIndex(estate)): string[] {
+  const start = treeStart(estate, children);
+  const parents = parentIndex(children);
+  const out: string[] = [];
+  for (const n of estate.nodes.values()) {
+    if (n.role === undefined || n.role === 'fluxreport' || start.has(n.id)) continue;
+    const p = parents.get(n.id);
+    if (p === undefined || start.has(p)) out.push(n.id);
+  }
+  return out.sort((a, b) => compareNodes(estate.nodes.get(a), estate.nodes.get(b)));
+}
+
+/** The breadcrumb to a drilled-into object: its ancestors from the top level down, ending with itself. */
+export function treePath(
+  estate: Estate,
+  focus: string,
+  children: Map<string, string[]> = childIndex(estate),
+): string[] {
+  const start = treeStart(estate, children);
+  const parents = parentIndex(children);
+  const path: string[] = [];
+  const seen = new Set<string>();
+  let current: string | undefined = focus;
+  while (current !== undefined && estate.nodes.has(current) && !seen.has(current)) {
+    seen.add(current);
+    path.unshift(current);
+    const p = parents.get(current);
+    if (p === undefined || start.has(p)) break;
+    current = p;
+  }
+  return path;
+}
+
+/**
+ * Lays out one page of the tree as levels (`depth`) and leaf slots (`row`), parents centred on their
+ * children; the view turns that into top-to-bottom or left-to-right positions.
+ *
+ * Without `focus` it is the top level: one card per `topLevel` object, nothing expanded. With `focus` it
+ * is that object and what it manages; for a source, the objects that use it, unfolded. `expanded`
+ * overrides the default (the page's object open, problems open, healthy branches closed).
  */
 export function layoutTree(
   estate: Estate,
   filters: ViewFilters,
   expanded: ReadonlyMap<string, boolean> = new Map(),
   children: Map<string, string[]> = childIndex(estate),
+  focus?: string,
 ): TreeLayout {
   const worst = worstStates(estate, children);
+  const consumers = sourceConsumers(estate);
+  const focusNode = focus === undefined ? undefined : estate.nodes.get(focus);
+  const sourcePage = focusNode?.role === 'source';
   // Kustomizations in pipeline order (crds before controllers before configs), like the Stages view.
   const stages = kustomizationStages(estate);
   const byStage = (a: string, b: string): number => {
@@ -155,29 +237,56 @@ export function layoutTree(
   const keep = (id: string): boolean => {
     const n = estate.nodes.get(id);
     if (n === undefined) return false;
-    if (filters.onlyProblems && !isProblem(worst.get(id) ?? n.state) && id !== estate.root) return false;
+    if (filters.onlyProblems && !isProblem(worst.get(id) ?? n.state) && id !== focus) return false;
     return true;
+  };
+  const childrenOf = (id: string): string[] =>
+    id === focus && sourcePage ? (consumers.get(id) ?? []) : (children.get(id) ?? []);
+  const drillable = (id: string): boolean => {
+    if (id === focus) return false;
+    if ((children.get(id)?.length ?? 0) > 0) return true;
+    return estate.nodes.get(id)?.role === 'source' && (consumers.get(id)?.length ?? 0) > 0;
   };
 
   // Hidden kinds (sources off, Helm releases off) lift their children one level up.
-  const visibleChildren = (id: string): string[] => {
+  const lift = (ids: string[]): string[] => {
     const out: string[] = [];
-    for (const c of children.get(id) ?? []) {
+    for (const c of ids) {
       const n = estate.nodes.get(c);
       if (n === undefined || seen.has(c)) continue;
-      if (!filters.showHelmReleases && n.role === 'helmrelease') out.push(...visibleChildren(c));
+      if (!filters.showHelmReleases && n.role === 'helmrelease') out.push(...lift(children.get(c) ?? []));
       else if (visible(n, filters) && keep(c)) out.push(c);
     }
-    return out.sort(byStage);
+    return out;
   };
+  const visibleChildren = (id: string): string[] => lift(childrenOf(id)).sort(byStage);
 
-  const place = (id: string, depth: number, parentKey: string | undefined, isRoot: boolean): TreeCard => {
+  if (focusNode === undefined) {
+    // The top level: one card per top-level object, each drilling into a page of its own.
+    for (const id of [...new Set(lift(topLevel(estate, children)))].sort(byStage)) {
+      cards.push({
+        key: id,
+        nodeId: id,
+        depth: 0,
+        row: rows++,
+        hidden: visibleChildren(id).length,
+        expanded: false,
+        expandable: false,
+        drillable: drillable(id),
+        worst: worst.get(id),
+      });
+    }
+    return { cards, edges, rows, depth: 0 };
+  }
+
+  const place = (id: string, depth: number, parentKey: string | undefined): TreeCard => {
     seen.add(id);
     const n = estate.nodes.get(id) as EstateNode;
     const kids = visibleChildren(id);
     const problemBelow = isProblem(worst.get(id) ?? n.state);
-    const defaultOpen = isRoot || problemBelow || depth === 0;
-    const open = kids.length > 0 && (expanded.get(id) ?? defaultOpen);
+    // The page's object is always open; on a source's page the objects that use it open too.
+    const defaultOpen = problemBelow || (sourcePage && depth === 1);
+    const open = kids.length > 0 && (depth === 0 || (expanded.get(id) ?? defaultOpen));
     const card: TreeCard = {
       key: id,
       nodeId: id,
@@ -187,6 +296,7 @@ export function layoutTree(
       hidden: open ? 0 : kids.length,
       expanded: open,
       expandable: kids.length > 0,
+      drillable: drillable(id),
       worst: worst.get(id),
     };
     cards.push(card);
@@ -210,7 +320,7 @@ export function layoutTree(
       const sameKind = byKind.get(k.kind) ?? [];
       const groupable = k.role === undefined && sameKind.length > filters.groupThreshold;
       if (!groupable) {
-        if (!seen.has(c)) placed.push(place(c, depth + 1, card.key, false));
+        if (!seen.has(c)) placed.push(place(c, depth + 1, card.key));
         continue;
       }
       if (sameKind[0] !== c) continue;
@@ -229,13 +339,14 @@ export function layoutTree(
         hidden: gOpen ? 0 : sameKind.length,
         expanded: gOpen,
         expandable: true,
+        drillable: false,
         worst: groupWorst,
       };
       cards.push(gCard);
       edges.push({ from: card.key, to: gKey });
       maxDepth = Math.max(maxDepth, depth + 1);
       if (gOpen) {
-        const sub = sameKind.filter((x) => !seen.has(x)).map((x) => place(x, depth + 2, gKey, false));
+        const sub = sameKind.filter((x) => !seen.has(x)).map((x) => place(x, depth + 2, gKey));
         gCard.row = sub.length > 0 ? centre(sub) : rows++;
       } else {
         sameKind.forEach((x) => seen.add(x));
@@ -247,24 +358,8 @@ export function layoutTree(
     return card;
   };
 
-  const roots: string[] = [];
-  if (estate.root !== undefined && keep(estate.root)) roots.push(estate.root);
-  // Flux objects nobody manages and no root to hang them on (e.g. no root Kustomization found).
-  if (estate.root === undefined) {
-    for (const n of estate.nodes.values()) {
-      if (
-        n.role !== undefined &&
-        n.role !== 'fluxreport' &&
-        n.managedBy === undefined &&
-        visible(n, filters) &&
-        keep(n.id)
-      )
-        roots.push(n.id);
-    }
-    roots.sort((a, b) => compareNodes(estate.nodes.get(a), estate.nodes.get(b)));
-  }
-  for (const r of roots) if (!seen.has(r)) place(r, 0, undefined, true);
-  return { cards, edges, rows, depth: maxDepth };
+  place(focusNode.id, 0, undefined);
+  return { cards, edges, rows, depth: maxDepth, focus: focusNode.id };
 }
 
 function centre(cards: TreeCard[]): number {

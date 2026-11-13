@@ -114,14 +114,18 @@ function NameLink({
   );
 }
 
-/** Each source, what it feeds and what it delivered; nested when a source's output defines further sources. */
+/**
+ * Each source, what it feeds and what it delivered; nested when a source's output defines further sources.
+ * Double-clicking a source (or its "Show in tree" link) opens the tree on that source.
+ */
 export function SourcesView({
   estate,
   sources,
   selected,
   overlays,
   onSelect,
-}: Common & { sources: SourceRow[] }): ReactElement {
+  onOpenInTree,
+}: Common & { sources: SourceRow[]; onOpenInTree?: (id: string) => void }): ReactElement {
   if (sources.length === 0) return <Typography sx={{ p: 2 }}>No sources found.</Typography>;
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, p: 2 }}>
@@ -138,13 +142,18 @@ export function SourcesView({
             key={row.id}
             sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', ml: row.level * 4, flexWrap: 'wrap' }}
           >
-            <NodeCard
-              node={n}
-              note={shortRevision(n.appliedRevision) || n.note}
-              selected={row.id === selected}
-              overlay={overlays?.get(row.id)}
-              onSelect={() => onSelect(row.id)}
-            />
+            <Box
+              onDoubleClick={onOpenInTree === undefined ? undefined : () => onOpenInTree(row.id)}
+              title={onOpenInTree === undefined ? undefined : 'Double-click to show it in the tree'}
+            >
+              <NodeCard
+                node={n}
+                note={shortRevision(n.appliedRevision) || n.note}
+                selected={row.id === selected}
+                overlay={overlays?.get(row.id)}
+                onSelect={() => onSelect(row.id)}
+              />
+            </Box>
             <Box sx={{ minWidth: 240, flex: 1, fontSize: 13 }}>
               <Typography variant="body2" component="div">
                 {row.kustomizations.length} Kustomizations, {row.helmReleases.length} HelmReleases
@@ -178,6 +187,17 @@ export function SourcesView({
                 <Typography variant="caption" component="div" sx={{ color: 'text.secondary' }}>
                   defined in <NameLink estate={estate} id={row.definedIn} onSelect={onSelect} />
                 </Typography>
+              )}
+              {onOpenInTree !== undefined && (
+                <Link
+                  component="button"
+                  type="button"
+                  aria-label={`Show what uses ${displayName(n)} in the tree`}
+                  onClick={() => onOpenInTree(row.id)}
+                  sx={{ fontSize: 12, mt: 0.5 }}
+                >
+                  Show in tree ›
+                </Link>
               )}
             </Box>
           </Box>

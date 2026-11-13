@@ -10,8 +10,8 @@ import { DatasourceSelect } from '@perses-dev/plugin-system';
 import type { DatasourceSelector } from '@perses-dev/spec';
 import type { ReactElement } from 'react';
 
-import type { FluxGitOpsChartOptions, FluxView } from './flux-gitops-chart-types';
-import { FLUX_VIEWS, withDefaults } from './flux-gitops-chart-types';
+import type { FluxGitOpsChartOptions, FluxView, TreeDirection } from './flux-gitops-chart-types';
+import { FLUX_VIEWS, TREE_DIRECTIONS, withDefaults } from './flux-gitops-chart-types';
 import { KUBERNETES_DATASOURCE_KIND, PROMETHEUS_DATASOURCE_KIND } from './useFluxData';
 
 type Props = OptionsEditorProps<FluxGitOpsChartOptions>;
@@ -22,6 +22,11 @@ const VIEW_LABEL: Record<FluxView, string> = {
   sources: 'Sources',
   inventory: 'Inventory',
   list: 'List',
+};
+
+const DIRECTION_LABEL: Record<TreeDirection, string> = {
+  vertical: 'Top to bottom',
+  horizontal: 'Left to right',
 };
 
 /** Every option in the schema, with the defaults `withDefaults` applies. */
@@ -132,6 +137,24 @@ export function FluxGitOpsChartSettingsEditor({ value, onChange }: Props): React
                 {FLUX_VIEWS.map((v) => (
                   <MenuItem key={v} value={v}>
                     {VIEW_LABEL[v]}
+                  </MenuItem>
+                ))}
+              </TextField>
+            }
+          />
+          <OptionsEditorControl
+            label="Tree direction"
+            control={
+              <TextField
+                select
+                size="small"
+                value={o.treeDirection}
+                inputProps={{ 'aria-label': 'Tree direction' }}
+                onChange={(e) => set('treeDirection', e.target.value as TreeDirection)}
+              >
+                {TREE_DIRECTIONS.map((d) => (
+                  <MenuItem key={d} value={d}>
+                    {DIRECTION_LABEL[d]}
                   </MenuItem>
                 ))}
               </TextField>

@@ -22,10 +22,12 @@ spec: close({
 	// The root Kustomization, `name` or `namespace/name`. `auto` (default) means flux-system/flux-system.
 	rootKustomization?: string
 	defaultView?:       "tree" | "stages" | "sources" | "inventory" | "list"
-	showSources?:       bool
-	showHelmReleases?:  bool
-	onlyProblems?:      bool
-	showPods?:          bool
+	// Tree layout: parents above their children (`vertical`, default) or left of them (`horizontal`).
+	treeDirection?:    "vertical" | "horizontal"
+	showSources?:      bool
+	showHelmReleases?: bool
+	onlyProblems?:     bool
+	showPods?:         bool
 	// Kinds with more objects than this under one parent are grouped ("8 ServiceMonitors"). Default 2.
 	groupThreshold?: int & >=1 & <=100
 	// Time range of the history strip. Default: the dashboard's time range.
