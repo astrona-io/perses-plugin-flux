@@ -16,9 +16,10 @@ All notable changes to this project are documented here. The format follows
 - Chart updates for HelmReleases: a "Chart update" column in the List view and a row in the drawer
   (`1.2.3 → 1.4.0`, in range or needs a bump). Read from the Helm repository index source-controller already
   serves, through the API server's service proxy, lazily and once per index digest. New option
-  `checkChartUpdates` (default `true`); `deploy/rbac.yaml` gains `get` on `services/proxy` for
-  `source-controller` only, and `deploy/kubernetes-datasource.json` a GET pattern limited to its index paths.
-  Adds the `yaml` and `semver` dependencies.
+  `checkChartUpdates` (default `true`). Adds the `yaml` and `semver` dependencies.
+  **Known limitation:** the Kubernetes datasource v0.1.0 refuses allow-list patterns that contain `proxy`, so the
+  index cannot be read yet and every cell shows "✕ no access" (set `checkChartUpdates: false` to hide them). The
+  shipped `deploy/rbac.yaml` and `deploy/kubernetes-datasource.json` do not grant the index path.
 - Tree pages: the tree tab opens on the top-level Flux objects (those no other Flux object manages); clicking a card
   with children opens its page, and a breadcrumb ("All resources › flux-system/apps › …") leads back. A "Flux root"
   link keeps the root's drawer reachable.

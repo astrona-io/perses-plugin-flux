@@ -145,6 +145,12 @@ on HelmRelease and HelmChart (upstream already has `revision` and `source_name` 
 
 ## Chart updates
 
+- **Not available with the Kubernetes datasource v0.1.0.** Its schema refuses every `allowedEndpoints` pattern that
+  contains `proxy` (`kubernetes-datasource.cue`), and Perses rejects the whole datasource when one does. So
+  `deploy/kubernetes-datasource.json` and `deploy/rbac.yaml` leave the index path and the `services/proxy` rule out,
+  and the cells show "✕ no access". The design below stays in the code for a datasource release that admits this one
+  exact, operator-supplied path.
+
 - **Read the index source-controller already serves, not the chart repository.** A HelmRepository's
   `status.artifact.url` points at source-controller's own Service. The panel reads it through the Kubernetes API
   service proxy (`/api/v1/namespaces/<ns>/services/source-controller:80/proxy/<path>`) via the datasource's Perses
