@@ -30,7 +30,13 @@ export interface NodeCardProps {
   overlay?: Overlay;
   /** +N / − control. */
   toggle?: { expanded: boolean; hidden: number; worst?: FluxState; onToggle: () => void };
+  /** Where the +N / − control sits: on the right edge (left-to-right tree) or the bottom edge (top-to-bottom). */
+  toggleSide?: 'right' | 'bottom';
   onSelect?: () => void;
+  /** Clicking the card drills into it (shown as a chevron); the details then open from `onDetails`. */
+  drill?: boolean;
+  /** An ⓘ button that opens the details drawer. */
+  onDetails?: () => void;
   width?: number;
 }
 
@@ -43,7 +49,19 @@ function overlayColorOf(theme: Theme, overlay: Overlay | undefined): string | un
 
 /** A tree card: round kind badge, name, state icon and label, a note, the kind tag. Memoised: hover never re-renders it. */
 export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactElement {
-  const { node, group, note, selected, overlay, toggle, onSelect, width = CARD_W } = props;
+  const {
+    node,
+    group,
+    note,
+    selected,
+    overlay,
+    toggle,
+    toggleSide = 'right',
+    onSelect,
+    drill,
+    onDetails,
+    width = CARD_W,
+  } = props;
   const theme = useTheme();
   const kind = node?.kind ?? group?.kind ?? '';
   const state: FluxState = node?.state ?? group?.state ?? 'unknown';
@@ -57,13 +75,14 @@ export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactEleme
   const label = `${kind} ${node?.namespace ? `${node.namespace}/` : ''}${name}: ${STATE_LABEL[state]}${node?.reason ? ` (${node.reason})` : ''}${
     overlay ? `, ${OVERLAY_LABEL[overlay].slice(2)}` : ''
   }`;
+  const where = node === undefined ? name : `${node.namespace ? `${node.namespace}/` : ''}${node.name} (${kind})`;
 
   return (
     <Box sx={{ position: 'relative', width, height: CARD_H }}>
       <Box
         component="button"
         type="button"
-        aria-label={label}
+        aria-label={drill ? `${label}, open its page` : label}
         aria-pressed={selected}
         title={node?.message ?? label}
         onClick={onSelect}
@@ -79,7 +98,7 @@ export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactEleme
           alignItems: 'center',
           gap: 1,
           pl: 0.5,
-          pr: 1.5,
+          pr: onDetails !== undefined ? 3.5 : 1.5,
           borderRadius: 1.5,
           cursor: 'pointer',
           border: `${selected ? 2 : 1}px ${dashed ? 'dashed' : 'solid'} ${borderColor}`,
@@ -174,7 +193,59 @@ export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactEleme
             {OVERLAY_LABEL[overlay]}
           </Typography>
         )}
+        {drill && (
+          <Typography
+            aria-hidden
+            sx={{
+              position: 'absolute',
+              right: onDetails !== undefined ? 9 : 6,
+              top: onDetails !== undefined ? 26 : 16,
+              fontSize: 18,
+              lineHeight: '18px',
+              fontWeight: 700,
+              color: theme.palette.text.secondary,
+            }}
+          >
+            ›
+          </Typography>
+        )}
       </Box>
+      {onDetails !== undefined && (
+        <Box
+          component="button"
+          type="button"
+          aria-label={`Details of ${where}`}
+          title="Details"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDetails();
+          }}
+          sx={{
+            position: 'absolute',
+            right: 5,
+            top: 5,
+            width: 20,
+            height: 20,
+            p: 0,
+            display: 'grid',
+            placeItems: 'center',
+            borderRadius: '50%',
+            fontFamily: 'Georgia, serif',
+            fontStyle: 'italic',
+            fontSize: 12,
+            fontWeight: 700,
+            lineHeight: 1,
+            cursor: 'pointer',
+            color: theme.palette.text.secondary,
+            backgroundColor: theme.palette.background.paper,
+            border: `1px solid ${theme.palette.divider}`,
+            '&:hover': { color: theme.palette.primary.main, borderColor: theme.palette.primary.main },
+            '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}`, outlineOffset: 1 },
+          }}
+        >
+          i
+        </Box>
+      )}
       {toggle !== undefined && (
         <Box
           component="button"
@@ -187,9 +258,9 @@ export const NodeCard = memo(function NodeCard(props: NodeCardProps): ReactEleme
           }}
           sx={{
             position: 'absolute',
-            right: -13,
-            top: '50%',
-            transform: 'translateY(-50%)',
+            ...(toggleSide === 'bottom'
+              ? { left: '50%', bottom: -11, transform: 'translateX(-50%)' }
+              : { right: -13, top: '50%', transform: 'translateY(-50%)' }),
             minWidth: 26,
             height: 22,
             px: 0.5,

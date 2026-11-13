@@ -18,12 +18,26 @@ const filters = { showSources: true, showHelmReleases: true, onlyProblems: false
 
 describe('layoutTree', () => {
   const estate = stagedEstate();
+  // A page drilled into the root shows the whole estate, as the tree did before it had pages.
+  const rootPage = (f = filters, exp: ReadonlyMap<string, boolean> = new Map()): ReturnType<typeof layoutTree> =>
+    layoutTree(estate, f, exp, childIndex(estate), K('flux-system'));
 
-  it('starts at the root and opens problem branches by default', () => {
-    const t = layoutTree(estate, filters);
-    const root = t.cards[0];
-    expect(root?.nodeId).toBe(K('flux-system'));
-    expect(root?.depth).toBe(0);
+  it('starts at the top-level Flux objects, not the root, and drills into one', () => {
+    const top = layoutTree(estate, filters);
+    expect(top.focus).toBeUndefined();
+    expect(top.edges).toEqual([]);
+    expect(top.cards.every((c) => c.depth === 0 && !c.expanded)).toBe(true);
+    expect(top.cards.some((c) => c.nodeId === K('flux-system'))).toBe(false);
+    expect(top.cards.find((c) => c.nodeId === K('monitoring'))?.drillable).toBe(true);
+    const page = layoutTree(estate, filters, new Map(), childIndex(estate), K('monitoring'));
+    expect(page.focus).toBe(K('monitoring'));
+    expect(page.cards[0]?.nodeId).toBe(K('monitoring'));
+    expect(page.cards[0]?.expanded).toBe(true);
+    expect(page.cards.length).toBeGreaterThan(1);
+  });
+
+  it('opens problem branches by default', () => {
+    const t = rootPage();
     const monitoring = t.cards.find((c) => c.nodeId === K('monitoring'));
     expect(monitoring?.expanded).toBe(true);
     const crds = t.cards.find((c) => c.nodeId === K('infra-crds'));
@@ -36,16 +50,15 @@ describe('layoutTree', () => {
   });
 
   it('groups same-kind siblings over the threshold', () => {
-    const t = layoutTree(estate, filters);
+    const t = rootPage();
     const group = t.cards.find((c) => c.group?.kind === 'ServiceMonitor');
     expect(group?.group?.ids).toHaveLength(4);
-    const ungrouped = layoutTree(estate, { ...filters, groupThreshold: 10 });
+    const ungrouped = rootPage({ ...filters, groupThreshold: 10 });
     expect(ungrouped.cards.filter((c) => estate.nodes.get(c.nodeId ?? '')?.kind === 'ServiceMonitor')).toHaveLength(4);
   });
 
   it('expanded overrides win', () => {
-    const t = layoutTree(
-      estate,
+    const t = rootPage(
       filters,
       new Map([
         [K('monitoring'), false],
@@ -57,14 +70,14 @@ describe('layoutTree', () => {
   });
 
   it('only problems keeps the path to every problem and nothing healthy beside it', () => {
-    const t = layoutTree(estate, { ...filters, onlyProblems: true });
+    const t = rootPage({ ...filters, onlyProblems: true });
     const kinds = t.cards.map((c) => c.nodeId).filter((x): x is string => x !== undefined);
     expect(kinds).toContain(K('monitoring'));
     expect(kinds).not.toContain(K('infra-crds'));
   });
 
   it('hiding Helm releases lifts their children', () => {
-    const t = layoutTree(estate, { ...filters, showHelmReleases: false }, new Map([[K('infra-controllers'), true]]));
+    const t = rootPage({ ...filters, showHelmReleases: false }, new Map([[K('infra-controllers'), true]]));
     expect(t.cards.some((c) => estate.nodes.get(c.nodeId ?? '')?.kind === 'HelmRelease')).toBe(false);
     expect(t.cards.some((c) => c.nodeId === nodeId('apps', 'Deployment', 'cert-manager', 'cert-manager'))).toBe(true);
   });
@@ -72,7 +85,7 @@ describe('layoutTree', () => {
   it('lays out 300 objects without overlap', () => {
     const big = buildEstate(raw(largeObjects(300, 30)));
     const all = new Map([...big.nodes.keys()].map((id) => [id, true]));
-    const t = layoutTree(big, { ...filters, groupThreshold: 100 }, all);
+    const t = layoutTree(big, { ...filters, groupThreshold: 100 }, all, childIndex(big), big.root);
     expect(t.cards.length).toBeGreaterThanOrEqual(300);
     const slots = new Set(t.cards.map((c) => `${c.depth}:${c.row}`));
     expect(slots.size).toBe(t.cards.length);
