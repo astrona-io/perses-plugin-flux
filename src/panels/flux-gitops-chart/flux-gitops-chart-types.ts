@@ -23,6 +23,7 @@ export interface FluxGitOpsChartOptions {
   fluxWebUIUrl?: string;
   gitCommitUrl?: string;
   enableDeleteImpact?: boolean;
+  checkChartUpdates?: boolean;
 }
 
 export type ResolvedOptions = Required<
@@ -47,6 +48,7 @@ export const DEFAULT_OPTIONS = {
   groupThreshold: 2,
   showHistory: true,
   enableDeleteImpact: true,
+  checkChartUpdates: true,
 };
 
 export function withDefaults(options: FluxGitOpsChartOptions | undefined): ResolvedOptions {
@@ -63,6 +65,7 @@ export function withDefaults(options: FluxGitOpsChartOptions | undefined): Resol
     groupThreshold: o.groupThreshold ?? DEFAULT_OPTIONS.groupThreshold,
     showHistory: o.showHistory ?? DEFAULT_OPTIONS.showHistory,
     enableDeleteImpact: o.enableDeleteImpact ?? DEFAULT_OPTIONS.enableDeleteImpact,
+    checkChartUpdates: o.checkChartUpdates ?? DEFAULT_OPTIONS.checkChartUpdates,
   };
 }
 

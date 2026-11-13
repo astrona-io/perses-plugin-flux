@@ -16,6 +16,8 @@ export interface KubernetesListClient {
       signal?: AbortSignal;
     },
   ): Promise<{ items: T[]; truncated: boolean; pages: number }>;
+  /** The datasource's Perses proxy URL; the chart update check reads Helm indexes through it. */
+  options?: { datasourceUrl?: string };
 }
 
 export interface Resource {

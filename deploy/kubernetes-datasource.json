@@ -41,6 +41,10 @@
               {
                 "endpointPattern": "^/apis/fluxcd\\.controlplane\\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(fluxinstances|fluxreports|resourcesets|resourcesetinputproviders)$",
                 "method": "GET"
+              },
+              {
+                "endpointPattern": "^/api/v1/namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/services/source-controller:80/proxy/helmrepository/[a-z0-9]([-a-z0-9]*[a-z0-9])?/[a-z0-9]([-a-z0-9.]*[a-z0-9])?/index-[a-f0-9]+\\.yaml$",
+                "method": "GET"
               }
             ]
           }

@@ -80,6 +80,12 @@ export interface EstateNode {
   url?: string;
   chart?: string;
   chartVersion?: string;
+  /** The chart version range: `spec.chart.spec.version` on a HelmRelease, `spec.version` on a HelmChart. */
+  chartRange?: string;
+  /** For a HelmRepository: `spec.type` (`default`, i.e. HTTP, or `oci`). */
+  repoType?: string;
+  /** For a source: `status.artifact.url`, where source-controller serves the artifact in the cluster. */
+  artifactUrl?: string;
   appliedRevision?: string;
   attemptedRevision?: string;
   sourceRevision?: string;
@@ -278,7 +284,10 @@ function fluxFields(node: EstateNode, obj: KubeObject, role: FluxRole): void {
   node.appliedRevision = str(status.lastAppliedRevision);
   node.attemptedRevision = str(status.lastAttemptedRevision);
   const artifact = rec(status.artifact);
-  if (role === 'source') node.appliedRevision = str(artifact?.revision);
+  if (role === 'source') {
+    node.appliedRevision = str(artifact?.revision);
+    node.artifactUrl = str(artifact?.url);
+  }
   node.originRevision = str(status.lastAppliedOriginRevision);
   const artifactMeta = rec(artifact?.metadata);
   if (role === 'source' && artifactMeta !== undefined) {
@@ -313,6 +322,7 @@ function fluxFields(node: EstateNode, obj: KubeObject, role: FluxRole): void {
       if (ref !== undefined)
         node.sourceRef = nodeId(SOURCE_GROUP, ref.kind ?? '', ref.namespace ?? node.namespace, ref.name);
       node.chart = str(chartSpec.chart);
+      node.chartRange = str(chartSpec.version);
     }
     const helmChart = str(status.helmChart);
     if (helmChart !== undefined && helmChart.includes('/')) {
@@ -346,9 +356,11 @@ function fluxFields(node: EstateNode, obj: KubeObject, role: FluxRole): void {
   if (role === 'source') {
     if (node.kind === 'HelmChart') {
       node.chart = str(spec.chart);
+      node.chartRange = str(spec.version);
       const ref = asCrossRef(spec.sourceRef);
       if (ref !== undefined) node.sourceRef = nodeId(SOURCE_GROUP, ref.kind ?? '', node.namespace, ref.name);
     }
+    if (node.kind === 'HelmRepository') node.repoType = str(spec.type) ?? 'default';
     node.note = node.appliedRevision;
   }
 

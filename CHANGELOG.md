@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Chart updates for HelmReleases: a "Chart update" column in the List view and a row in the drawer
+  (`1.2.3 → 1.4.0`, in range or needs a bump). Read from the Helm repository index source-controller already
+  serves, through the API server's service proxy, lazily and once per index digest. New option
+  `checkChartUpdates` (default `true`); `deploy/rbac.yaml` gains `get` on `services/proxy` for
+  `source-controller` only, and `deploy/kubernetes-datasource.json` a GET pattern limited to its index paths.
+  Adds the `yaml` and `semver` dependencies.
+
 ## [0.1.0] - 2026-11-13
 
 ### Added
