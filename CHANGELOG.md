@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-13
+
 ### Added
 
 - **Flux resources view** (`defaultView: flux`): the Flux installation, its controllers and per-kind counts by
@@ -47,4 +49,6 @@ All notable changes to this project are documented here. The format follows
 - `deploy/`: read-only RBAC, the datasource allow-list, and an extended kube-state-metrics config.
 - A `dev/` stack with two profiles (plain Flux, Flux Operator) and a staged fleet with every state.
 
+[Unreleased]: https://github.com/astrona-io/perses-plugin-flux/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.2.0
 [0.1.0]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.1.0
