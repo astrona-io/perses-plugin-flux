@@ -334,16 +334,16 @@ replaces the default, so keep the directory of bundled plugins in the list. Inst
 ### Option A: release archive
 
 ```bash
-curl -fLO https://github.com/astrona-io/perses-plugin-flux/releases/download/v0.2.0/FluxGitOps-0.2.0.tar.gz
-curl -fLO https://github.com/astrona-io/perses-plugin-flux/releases/download/v0.2.0/FluxGitOps-0.2.0.tar.gz.sha256
-sha256sum -c FluxGitOps-0.2.0.tar.gz.sha256
+curl -fLO https://github.com/astrona-io/perses-plugin-flux/releases/download/v0.3.0/FluxGitOps-0.3.0.tar.gz
+curl -fLO https://github.com/astrona-io/perses-plugin-flux/releases/download/v0.3.0/FluxGitOps-0.3.0.tar.gz.sha256
+sha256sum -c FluxGitOps-0.3.0.tar.gz.sha256
 ```
 
 ```yaml
 plugin:
   archive_paths:
     - /etc/perses/plugins-archive # plugins bundled with Perses
-    - /etc/perses/plugins-archive-flux # put FluxGitOps-0.2.0.tar.gz here
+    - /etc/perses/plugins-archive-flux # put FluxGitOps-0.3.0.tar.gz here
 ```
 
 ### Option B: Kubernetes image volume
@@ -357,7 +357,7 @@ mount path to `archive_paths` as in option A:
 volumes:
   - name: flux-plugin
     image:
-      reference: ghcr.io/astrona-io/perses-plugin-flux:v0.2.0
+      reference: ghcr.io/astrona-io/perses-plugin-flux:v0.3.0
       pullPolicy: IfNotPresent
 containers:
   - name: perses
@@ -371,7 +371,7 @@ containers:
 
 ```dockerfile
 FROM persesdev/perses:v0.55.1
-COPY FluxGitOps-0.2.0.tar.gz /etc/perses/plugins-archive/
+COPY FluxGitOps-0.3.0.tar.gz /etc/perses/plugins-archive/
 ```
 
 ## Documentation
