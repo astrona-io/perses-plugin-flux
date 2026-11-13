@@ -21,7 +21,7 @@ spec: close({
 	namespaces?: [...string]
 	// The root Kustomization, `name` or `namespace/name`. `auto` (default) means flux-system/flux-system.
 	rootKustomization?: string
-	defaultView?:       "tree" | "stages" | "sources" | "inventory" | "list"
+	defaultView?:       "tree" | "stages" | "sources" | "inventory" | "list" | "flux"
 	showSources?:       bool
 	showHelmReleases?:  bool
 	onlyProblems?:      bool

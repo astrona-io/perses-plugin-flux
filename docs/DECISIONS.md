@@ -100,6 +100,41 @@ lives in this plugin.
   protected Namespace stops its cascade.
 - **Sources** delete nothing; every consumer is marked "will fail".
 
+## Flux resources view
+
+`src/model/flux-resources.ts` is a pure function over the estate and the read failures; the view is
+`FluxResourcesView.tsx`. Field names were checked against `controlplaneio-fluxcd/flux-operator` `main` on 2026-11-13.
+
+- **With the Flux Operator, the numbers are the operator's.** The FluxReport `spec`
+  (`api/v1/fluxreport_types.go`, [FluxReport docs](https://fluxoperator.dev/docs/crd/fluxreport/)):
+  `distribution{version,status,entitlement,managedBy}`, `cluster{serverVersion,platform,nodes}`,
+  `operator{apiVersion,version,platform}`, `components[]{name,ready,status,image}`,
+  `reconcilers[]{apiVersion,kind,stats{running,failing,suspended,totalSize}}` and `sync{id,path,ready,status,source}`.
+  The only accepted FluxReport name is `flux` (a CEL rule on the type). The report is refreshed on the operator's
+  interval, so the view says it can lag a few minutes.
+- **The FluxInstance adds what was asked for** (`api/v1/fluxinstance_types.go`,
+  [FluxInstance docs](https://fluxoperator.dev/docs/crd/fluxinstance/)): `spec.distribution{version,registry,artifact}`,
+  `spec.components[]`, `spec.sync{kind,url,ref,path}`, and from status `lastAppliedRevision`, `lastAttemptedRevision`,
+  `lastArtifactRevision` and `components[]{name,repository,tag,digest}`. Ready comes from its conditions, as on every
+  node.
+- **Reconciler stats, as the operator counts them** (`internal/reporter/reconcilers.go`): `running` is total minus
+  suspended, so the view's Total is `running + suspended`; `failing` is Ready=False with a reason other than
+  `DependencyNotReady`, not suspended; suspension wins over the Ready condition; `totalSize` is the sum of
+  `status.artifact.size`. Components (`internal/reporter/components.go`) are the Deployments in the operator's
+  namespace, Ready when kstatus says Current, status `"<kstatus> <message>"`, image of the first container.
+- **Without the operator, the panel counts.** Controllers are the live `apps/Deployment`s whose name matches the
+  Flux controllers (ready/desired replicas, first container image, tag as the version). Per-kind counts are the
+  panel's display states bucketed: Ready (ready, drift corrected, reconcile disabled), Reconciling (reconciling, out
+  of sync), Waiting, Failed, Suspended; Unknown is in Total only. They cover only the namespaces the panel reads, and
+  the view says so.
+- **A failed read shows its error, never zeros.** A list that failed (forbidden, proxy, network) gives that kind a
+  "Not read" row with the message, and a failed Deployment list replaces the controllers table with the error. A 404
+  means the API is not served and says "not installed". The operator installed but no FluxReport is a warning, not
+  an empty table.
+- **Reconcile rate and mean duration per kind** come from Prometheus when the Prometheus datasource is set:
+  `sum by (kind) (rate(gotk_reconcile_duration_seconds_count[<range>]))` and `…_sum / …_count`, one point at the end
+  of the dashboard range. Only this tab runs the query.
+
 ## Metrics and Prometheus
 
 See [metrics.md](metrics.md). In short: `flux_resource_info` from the Flux Operator is preferred, else

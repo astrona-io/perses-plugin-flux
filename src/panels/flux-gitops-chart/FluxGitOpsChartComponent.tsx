@@ -20,6 +20,7 @@ import {
 import { DeleteReport, Details } from './Drawer';
 import type { FluxGitOpsChartProps, FluxView, ResolvedOptions } from './flux-gitops-chart-types';
 import { withDefaults } from './flux-gitops-chart-types';
+import { FluxResourcesTab } from './FluxResourcesView';
 import { KpiTiles, Legend, Toolbar } from './Header';
 import { HistoryStrip } from './HistoryStrip';
 import type { Overlay } from './NodeCard';
@@ -231,6 +232,18 @@ export function FluxGitOpsView({ options, data, width }: FluxGitOpsViewProps): R
           list && (
             <ListView estate={estate} rows={list} selected={selected} onSelect={onSelect} now={data.range.end * 1000} />
           )
+        );
+      case 'flux':
+        return (
+          <FluxResourcesTab
+            estate={estate}
+            failures={data.failures}
+            options={options}
+            range={data.range}
+            cluster={data.cluster}
+            selected={selected}
+            onSelect={onSelect}
+          />
         );
       default:
         return (

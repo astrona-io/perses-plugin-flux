@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Flux resources view** (`defaultView: flux`): the Flux installation, its controllers and per-kind counts by
+  state. With the Flux Operator it reads the FluxInstance and the FluxReport (`components`, `reconcilers`, `sync`);
+  without it, the controller Deployments and the panel's own counts. It names its source, shows a failed read as an
+  error instead of zero, and adds reconciles per minute and mean duration per kind from
+  `gotk_reconcile_duration_seconds` when Prometheus is set.
+
 ## [0.1.0] - 2026-11-13
 
 ### Added
