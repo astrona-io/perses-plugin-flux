@@ -36,4 +36,7 @@ spec: close({
 	// Commit link template with ${revision} and ${repo}, e.g. https://${repo}/commit/${revision}
 	gitCommitUrl?:       string
 	enableDeleteImpact?: bool
+	// Compare each HelmRelease's chart version with its HelmRepository index, read from source-controller
+	// through the API server's service proxy. Needs the services/proxy rule in deploy/rbac.yaml. Default true.
+	checkChartUpdates?: bool
 })

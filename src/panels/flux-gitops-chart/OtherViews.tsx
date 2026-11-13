@@ -14,6 +14,7 @@ import {
 import type { ReactElement, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 
+import type { ChartUpdate } from '../../model/chart-updates';
 import type { Estate } from '../../model/estate';
 import { displayName } from '../../model/estate';
 import { STATE_ICON, STATE_LABEL, shortRevision } from '../../model/state';
@@ -25,6 +26,7 @@ import type {
   ListRow,
 } from '../../model/views';
 import { sortList } from '../../model/views';
+import { ChartUpdateLabel } from './ChartUpdate';
 import { NodeCard } from './NodeCard';
 import type { Overlay } from './NodeCard';
 import { MONO, stateColor } from './style';
@@ -262,14 +264,19 @@ function sortDirection(dir: 1 | -1): 'asc' | 'desc' {
   return dir === 1 ? 'asc' : 'desc';
 }
 
-/** Every Flux object as a sortable table. */
+/** Every Flux object as a sortable table; with `chartUpdates`, a column for HelmRelease chart updates. */
 export function ListView({
   estate,
   rows,
   selected,
   onSelect,
   now,
-}: Omit<Common, 'overlays'> & { rows: ListRow[]; now: number }): ReactElement {
+  chartUpdates,
+}: Omit<Common, 'overlays'> & {
+  rows: ListRow[];
+  now: number;
+  chartUpdates?: Map<string, ChartUpdate>;
+}): ReactElement {
   const theme = useTheme();
   const [sort, setSort] = useState<{ key: ListSortKey; dir: 1 | -1 }>({ key: 'status', dir: 1 });
   const sorted = useMemo(() => sortList(rows, sort.key, sort.dir), [rows, sort]);
@@ -289,6 +296,7 @@ export function ListView({
               </TableSortLabel>
             </TableCell>
           ))}
+          {chartUpdates !== undefined && <TableCell>Chart update</TableCell>}
         </TableRow>
       </TableHead>
       <TableBody>
@@ -313,6 +321,11 @@ export function ListView({
             <TableCell>{r.stage ?? ''}</TableCell>
             <TableCell sx={{ fontFamily: MONO, fontSize: 12 }}>{shortRevision(r.revision) || r.revision}</TableCell>
             <TableCell>{age(r.createdAt, now)}</TableCell>
+            {chartUpdates !== undefined && (
+              <TableCell sx={{ whiteSpace: 'nowrap', fontSize: 12 }}>
+                {chartUpdates.has(r.id) && <ChartUpdateLabel update={chartUpdates.get(r.id) as ChartUpdate} />}
+              </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>

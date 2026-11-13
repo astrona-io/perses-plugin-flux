@@ -152,11 +152,17 @@ describe('allow-list paths', () => {
     await fetchEstate(all, { showPods: true });
     const scoped = fakeClient({});
     await fetchEstate(scoped, { showPods: true, namespaces: ['flux-system', 'team-a1'] });
-    const expected = [...new Set([...all.calls, ...scoped.calls])].sort();
+    // Chart updates read one more kind of path: a HelmRepository index through source-controller's proxy.
+    const { indexProxyPath } = await import('./chart-updates');
+    const index = indexProxyPath(
+      'http://source-controller.flux-system.svc.cluster.local./helmrepository/team-a1/podinfo/index-0f1e2d3c4b5a.yaml',
+    );
+    const indexPaths = 'path' in index ? [index.path] : [];
+    const expected = [...new Set([...all.calls, ...scoped.calls, ...indexPaths])].sort();
     const { readFileSync, writeFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const file = resolve(process.cwd(), 'test/allowlist/paths.json');
-    // UPDATE_ALLOWLIST=1 npm test rewrites the file after a change to RESOURCES.
+    // UPDATE_ALLOWLIST=1 npm test rewrites the file after a change to RESOURCES or the index path.
     if (process.env.UPDATE_ALLOWLIST) writeFileSync(file, `${JSON.stringify({ allowed: expected }, null, 2)}\n`);
     const listed = JSON.parse(readFileSync(file, 'utf8')) as { allowed: string[] };
     expect([...listed.allowed].sort()).toEqual(expected);

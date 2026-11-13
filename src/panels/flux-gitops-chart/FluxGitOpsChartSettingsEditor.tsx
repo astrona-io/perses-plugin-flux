@@ -54,7 +54,14 @@ export function FluxGitOpsChartSettingsEditor({ value, onChange }: Props): React
     />
   );
   const toggle = (
-    key: 'showSources' | 'showHelmReleases' | 'onlyProblems' | 'showPods' | 'showHistory' | 'enableDeleteImpact',
+    key:
+      | 'showSources'
+      | 'showHelmReleases'
+      | 'onlyProblems'
+      | 'showPods'
+      | 'showHistory'
+      | 'enableDeleteImpact'
+      | 'checkChartUpdates',
     label: string,
   ): ReactElement => (
     <OptionsEditorControl
@@ -158,6 +165,7 @@ export function FluxGitOpsChartSettingsEditor({ value, onChange }: Props): React
             }
           />
           {toggle('enableDeleteImpact', 'Delete impact preview')}
+          {toggle('checkChartUpdates', 'Check Helm chart updates')}
         </OptionsEditorGroup>
         <OptionsEditorGroup title="Links">
           {text('fluxWebUIUrl', 'Flux web UI', 'https://flux.example.com/resource/${kind}/${namespace}/${name}')}

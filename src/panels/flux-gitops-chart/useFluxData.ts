@@ -8,6 +8,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import type { IndexReader } from '../../model/chart-index';
+import { proxyIndexReader } from '../../model/chart-index';
 import type { Estate } from '../../model/estate';
 import { buildEstate } from '../../model/estate';
 import type { FetchResult, KubernetesListClient, ReadFailure, ReadProblem } from '../../model/fetch';
@@ -33,6 +35,8 @@ export interface FluxData {
   historyLoading: boolean;
   cluster: string;
   range: { start: number; end: number };
+  /** Reads Helm repository indexes through the Kubernetes datasource (option checkChartUpdates). */
+  chartIndex?: IndexReader;
 }
 
 /** Splits `a, b` and `{a,b}` (a variable in csv or default format) into namespaces. */
@@ -94,6 +98,12 @@ export function useFluxData(o: ResolvedOptions): FluxData {
     queryFn: async () => fetchHistory(pClient.data as PrometheusRangeClient, range, cluster),
   });
 
+  const datasourceUrl = kClient.data?.options?.datasourceUrl;
+  const chartIndex = useMemo(
+    () => (o.checkChartUpdates && datasourceUrl ? proxyIndexReader(datasourceUrl) : undefined),
+    [o.checkChartUpdates, datasourceUrl],
+  );
+
   const fatal =
     kClient.error instanceof Error
       ? new Error(`Kubernetes datasource: ${kClient.error.message}`)
@@ -111,5 +121,6 @@ export function useFluxData(o: ResolvedOptions): FluxData {
     historyLoading: history.isLoading && history.fetchStatus !== 'idle',
     cluster,
     range,
+    chartIndex,
   };
 }
