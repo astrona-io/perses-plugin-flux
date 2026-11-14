@@ -33,7 +33,7 @@ jobs:
           tar -xzf perses.tar.gz -C "$RUNNER_TEMP/bin" percli
           tar -xzf cue.tar.gz -C "$RUNNER_TEMP/bin" cue
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
           cache: false
