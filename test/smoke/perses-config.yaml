@@ -2,7 +2,7 @@
 # (test/smoke/compose.yaml) allowed for the datasource proxy, which refuses private addresses by default.
 database:
   file:
-    folder: /tmp/perses
+    folder: /tmp/perses # writable by the image's nonroot user
 security:
   enable_auth: false
 datasource:
