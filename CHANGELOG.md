@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-23
+
+### Added
+
+- A smoke test (`npm run smoke`, `test/smoke/`) that runs on every pull request: Perses v0.55.1 loads the built
+  archive and the Kubernetes datasource against a fake API server, and Chromium checks that the panel renders the
+  Flux objects without module federation errors.
+
+### Changed
+
+- Peer dependency ranges widened to `@mui/material` `^6.1.10 || ^9.0.0`, `@tanstack/react-query`
+  `^4.39.1 || ^5.0.0` and `@hookform/resolvers` `^5.9.1 || ^7.0.0`; `echarts` is now `6.1.0`. The panel still
+  uses the host's shared copies at runtime.
+- Build and tooling: `@rsbuild/core` and `@rsbuild/plugin-react` v2, cross-env v10, oxfmt 0.79.0, oxlint 1.94.0,
+  npm 11.21.3, and v7 of the checkout, setup-node and setup-go actions.
+- Renovate merges every update once CI passes.
+
 ## [0.3.0] - 2026-11-13
 
 ### Added
@@ -78,7 +95,8 @@ All notable changes to this project are documented here. The format follows
 - `deploy/`: read-only RBAC, the datasource allow-list, and an extended kube-state-metrics config.
 - A `dev/` stack with two profiles (plain Flux, Flux Operator) and a staged fleet with every state.
 
-[Unreleased]: https://github.com/astrona-io/perses-plugin-flux/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/astrona-io/perses-plugin-flux/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.3.1
 [0.3.0]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.3.0
 [0.2.0]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.2.0
 [0.1.0]: https://github.com/astrona-io/perses-plugin-flux/releases/tag/v0.1.0
