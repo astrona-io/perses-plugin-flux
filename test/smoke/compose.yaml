@@ -1,0 +1,30 @@
+# The smoke-test stack: Perses (the version the plugin targets) with this plugin's archive and the
+# Kubernetes datasource, reading a fake API server. Started by test/smoke/run.sh.
+name: perses-plugin-flux-smoke
+
+networks:
+  smoke:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+
+services:
+  fake-kube:
+    image: docker.io/library/node:24-alpine
+    command: ['node', '/smoke/fake-kube.mjs']
+    volumes:
+      - ./fake-kube.mjs:/smoke/fake-kube.mjs:ro
+    networks: [smoke]
+
+  perses:
+    image: docker.io/persesdev/perses:v${PERSES_VERSION:-0.55.1}
+    command: ['--config', '/etc/perses/config/config.yaml']
+    ports:
+      - '127.0.0.1:${SMOKE_PORT:-18095}:8080'
+    volumes:
+      - ./perses-config.yaml:/etc/perses/config/config.yaml:ro
+      - ./provisioning:/etc/perses/provisioning:ro
+      - ./.state/archive/kubernetes:/etc/perses/plugins-archive-kubernetes:ro
+      - ./.state/archive/flux:/etc/perses/plugins-archive-flux:ro
+    networks: [smoke]
+    depends_on: [fake-kube]

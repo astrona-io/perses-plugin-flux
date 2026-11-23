@@ -49,3 +49,14 @@ jobs:
       - run: percli plugin test-schemas
       - run: npm run build
       - run: percli plugin build
+      # In this job, not its own, so Renovate's auto-merge (which waits on `validate`) waits on it too.
+      - name: Smoke test in Perses
+        run: |
+          npx playwright install --with-deps chromium
+          npm run smoke
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: smoke-results
+          path: test/smoke/.state/results
+          if-no-files-found: ignore

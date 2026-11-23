@@ -1,0 +1,20 @@
+# Perses for the smoke test: no auth, the plugin archives from test/smoke/.state, and the compose network
+# (test/smoke/compose.yaml) allowed for the datasource proxy, which refuses private addresses by default.
+database:
+  file:
+    folder: /tmp/perses # writable by the image's nonroot user
+security:
+  enable_auth: false
+datasource:
+  proxy:
+    allowed_networks:
+      - 172.31.250.0/24
+plugin:
+  archive_paths:
+    - /etc/perses/plugins-archive
+    - /etc/perses/plugins-archive-kubernetes
+    - /etc/perses/plugins-archive-flux
+provisioning:
+  interval: 5s
+  folders:
+    - /etc/perses/provisioning
