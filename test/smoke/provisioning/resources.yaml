@@ -1,0 +1,68 @@
+kind: Project
+metadata:
+  name: smoke
+spec:
+  display:
+    name: Smoke test
+---
+# No secret: the fake API server (test/smoke/fake-kube.mjs) takes no credentials.
+kind: GlobalDatasource
+metadata:
+  name: kubernetes
+spec:
+  default: true
+  plugin:
+    kind: KubernetesDatasource
+    spec:
+      proxy:
+        kind: HTTPProxy
+        spec:
+          url: http://fake-kube:8080
+          allowedEndpoints:
+            - endpointPattern: ^/api/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(namespaces|pods|events|services|persistentvolumeclaims)$
+              method: GET
+            - endpointPattern: ^/apis/apps/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(deployments|statefulsets|daemonsets|replicasets)$
+              method: GET
+            - endpointPattern: ^/apis/source\.toolkit\.fluxcd\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(gitrepositories|ocirepositories|helmrepositories|helmcharts|buckets)$
+              method: GET
+            - endpointPattern: ^/apis/kustomize\.toolkit\.fluxcd\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?kustomizations$
+              method: GET
+            - endpointPattern: ^/apis/helm\.toolkit\.fluxcd\.io/v2/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?helmreleases$
+              method: GET
+            - endpointPattern: ^/apis/fluxcd\.controlplane\.io/v1/(namespaces/[a-z0-9]([-a-z0-9]*[a-z0-9])?/)?(fluxinstances|fluxreports|resourcesets|resourcesetinputproviders)$
+              method: GET
+---
+kind: Dashboard
+metadata:
+  name: flux
+  project: smoke
+spec:
+  display:
+    name: Flux smoke test
+  duration: 1h
+  variables: []
+  panels:
+    flux:
+      kind: Panel
+      spec:
+        display:
+          name: Flux GitOps
+        plugin:
+          kind: FluxGitOpsChart
+          spec:
+            kubernetesDatasource:
+              kind: KubernetesDatasource
+              name: kubernetes
+            defaultView: tree
+            showHistory: false
+            checkChartUpdates: false
+  layouts:
+    - kind: Grid
+      spec:
+        items:
+          - x: 0
+            y: 0
+            width: 24
+            height: 30
+            content:
+              $ref: '#/spec/panels/flux'

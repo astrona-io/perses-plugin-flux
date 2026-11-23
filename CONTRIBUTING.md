@@ -31,7 +31,11 @@ cue mod tidy --check
 percli plugin test-schemas      # CUE schema against schemas/**/tests/{valid,invalid}
 npm run build                   # module-federation bundle in dist/
 percli plugin build             # writes FluxGitOps-<version>.tar.gz
+npm run smoke                   # the archive in a real Perses against a fake API server, checked in Chromium
 ```
+
+`npm run smoke` needs docker with compose (or `CONTAINER_ENGINE=podman`) and Playwright's Chromium
+(`npx playwright install chromium`); `KEEP=1` leaves the stack running on http://127.0.0.1:18095.
 
 CI runs all of them on every pull request. Please run them locally first.
 

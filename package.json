@@ -18,13 +18,15 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "test": "cross-env LC_ALL=C TZ=UTC vitest run",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "smoke": "test/smoke/run.sh"
   },
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
   "devDependencies": {
     "@module-federation/rsbuild-plugin": "^2.9.1",
+    "@playwright/test": "^1.65.1",
     "@rsbuild/core": "^2.0.0",
     "@rsbuild/plugin-react": "^2.0.0",
     "@swc/cli": "^0.8.1",

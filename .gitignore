@@ -26,3 +26,6 @@ dist/
 # dev stack: plugin archives and per-profile state (kubeconfig, rendered files, fleet repository)
 dev/archive/
 dev/.state/
+
+# smoke test: plugin archives and Playwright results
+test/smoke/.state/
