@@ -79,7 +79,7 @@
     "mf-manifest.json",
     "mf-stats.json"
   ],
-  "packageManager": "npm@11.21.3",
+  "packageManager": "npm@12.2.3",
   "perses": {
     "metadata": {
       "name": "FluxGitOps",
